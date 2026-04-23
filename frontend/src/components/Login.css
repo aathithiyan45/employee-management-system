@@ -1,0 +1,195 @@
+/* ─── Login.css ─────────────────────────────────────────── */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--blue-900) 0%, var(--blue-700) 55%, var(--teal-600) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* decorative blobs */
+.login-page::before,
+.login-page::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.12;
+  pointer-events: none;
+}
+.login-page::before {
+  width: 560px; height: 560px;
+  background: var(--teal-400);
+  top: -160px; right: -160px;
+}
+.login-page::after {
+  width: 420px; height: 420px;
+  background: var(--blue-500);
+  bottom: -140px; left: -120px;
+}
+
+/* ── card ── */
+.login-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  background: var(--white);
+  border-radius: var(--radius-xl);
+  padding: 48px 44px 44px;
+  box-shadow: var(--shadow-xl);
+  animation: slideUp 0.5s cubic-bezier(0.22,1,0.36,1);
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* brand mark */
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 36px;
+}
+
+.login-brand-icon {
+  width: 44px; height: 44px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--blue-700), var(--teal-500));
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.login-brand-icon svg {
+  width: 22px; height: 22px;
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.login-brand-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--grey-900);
+  letter-spacing: -0.3px;
+}
+
+.login-brand-name span {
+  color: var(--blue-700);
+}
+
+.login-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--grey-900);
+  letter-spacing: -0.4px;
+  margin-bottom: 6px;
+}
+
+.login-subtitle {
+  font-size: 13.5px;
+  color: var(--grey-400);
+  margin-bottom: 28px;
+}
+
+/* role toggle */
+.role-toggle {
+  display: flex;
+  background: var(--grey-100);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  margin-bottom: 24px;
+  gap: 4px;
+}
+
+.role-toggle button {
+  flex: 1;
+  padding: 9px 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: transparent;
+  color: var(--grey-600);
+  transition: all 0.2s;
+}
+
+.role-toggle button.active {
+  background: var(--white);
+  color: var(--blue-700);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* input group */
+.login-field {
+  margin-bottom: 16px;
+}
+
+.login-field label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--grey-600);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 7px;
+}
+
+.login-field input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  font-size: 14.5px;
+  color: var(--grey-900);
+  background: var(--grey-50);
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.login-field input:focus {
+  outline: none;
+  border-color: var(--blue-600);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(21,101,192,0.12);
+}
+
+.login-field input::placeholder {
+  color: var(--grey-300);
+}
+
+/* login button */
+.login-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 13px;
+  background: linear-gradient(135deg, var(--blue-700), var(--blue-600));
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  letter-spacing: 0.2px;
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  box-shadow: 0 4px 14px rgba(21,101,192,0.35);
+}
+
+.login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(21,101,192,0.45);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+  opacity: 0.9;
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
