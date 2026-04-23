@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login from "./components/Login";
-import Dashboard from "./components/Dashboard";
-import EmployeeList from "./components/EmployeeList";
-import Profile from "./components/Profile";
-import PrivateRoute from "./components/PrivateRoute";
+import Login        from "./pages/Login";
+import Dashboard    from "./pages/Dashboard";
+import EmployeeList from "./pages/EmployeeList";
+import EmployeeDetail from "./pages/EmployeeDetail";
+import Profile      from "./components/Profile";
+import PrivateRoute from "./components/Privateroute";
 import "./App.css";
 
 function App() {
@@ -28,6 +29,14 @@ function App() {
           element={
             <PrivateRoute requiredRole="admin">
               <EmployeeList />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/employees/:empId"
+          element={
+            <PrivateRoute requiredRole="admin">
+              <EmployeeDetail />
             </PrivateRoute>
           }
         />

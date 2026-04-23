@@ -255,23 +255,61 @@ def import_excel(request):
 def get_divisions(request):
     divisions = Division.objects.all().values("id", "name")
     return Response(list(divisions))
+from django.db.models import Q
+
+from datetime import date, timedelta
+
 @api_view(['GET'])
 def employee_list(request):
-    division = request.GET.get("division")
-    status = request.GET.get("status")
+    division    = request.GET.get("division")
+    status      = request.GET.get("status")
+    search      = request.GET.get("search")
+    designation = request.GET.get("designation")
+    nationality = request.GET.get("nationality")
+    expiry_alert = request.GET.get("expiry_alert")
+    joined_from = request.GET.get("joined_from")
+    joined_to   = request.GET.get("joined_to")
 
     employees = Employee.objects.all()
 
+    if search:
+        employees = employees.filter(
+            Q(emp_id__icontains=search) | Q(name__icontains=search)
+        )
     if division:
         employees = employees.filter(division__name=division)
-
     if status == "active":
         employees = employees.filter(is_active=True)
     elif status == "inactive":
         employees = employees.filter(is_active=False)
 
-    data = []
+    # 🆕 Designation
+    if designation:
+        employees = employees.filter(
+            Q(designation_aug__icontains=designation) |
+            Q(designation_ipa__icontains=designation)
+        )
 
+    # 🆕 Nationality
+    if nationality:
+        employees = employees.filter(nationality__icontains=nationality)
+
+    # 🆕 Expiry Alert (30 days)
+    if expiry_alert:
+        today = date.today()
+        next_30 = today + timedelta(days=30)
+        if expiry_alert == "wp":
+            employees = employees.filter(wp_expiry__range=(today, next_30))
+        elif expiry_alert == "passport":
+            employees = employees.filter(passport_expiry__range=(today, next_30))
+
+    # 🆕 Date Range (joined / doa)
+    if joined_from:
+        employees = employees.filter(doa__gte=joined_from)
+    if joined_to:
+        employees = employees.filter(doa__lte=joined_to)
+
+    data = []
     for e in employees:
         data.append({
             "emp_id": e.emp_id,
