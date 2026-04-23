@@ -5,7 +5,8 @@ from .views import (
     import_excel,
     get_divisions,
     employee_list,
-    employee_detail   # must exist
+    employee_detail,
+    update_employee
 )
 
 urlpatterns = [
@@ -16,4 +17,5 @@ urlpatterns = [
 
     path('employees/', employee_list),
     path('employee/<str:emp_id>/', employee_detail),
+    path('employee/update/<str:emp_id>/', update_employee),
 ]

@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Login        from "./pages/Login";
-import Dashboard    from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
 import EmployeeList from "./pages/EmployeeList";
 import EmployeeDetail from "./pages/EmployeeDetail";
-import Profile      from "./components/Profile";
+import EmployeeProfile from "./pages/EmployeeProfile";
+import Profile from "./components/Profile";
 import PrivateRoute from "./components/Privateroute";
 import "./App.css";
 
@@ -11,7 +12,6 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-
         {/* 🔓 Public — Login */}
         <Route path="/" element={<Login />} />
 
@@ -40,6 +40,14 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route
+          path="/employees/:empId/profile"
+          element={
+            <PrivateRoute requiredRole="admin">
+              <EmployeeProfile />
+            </PrivateRoute>
+          }
+        />
 
         {/* 🔐 Employee only */}
         <Route
@@ -53,7 +61,6 @@ function App() {
 
         {/* 🔁 Catch-all → Login */}
         <Route path="*" element={<Navigate to="/" replace />} />
-
       </Routes>
     </BrowserRouter>
   );

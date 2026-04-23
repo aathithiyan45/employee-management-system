@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 from .models import Employee, Division
 from .models import User
@@ -303,24 +304,74 @@ def employee_list(request):
         elif expiry_alert == "passport":
             employees = employees.filter(passport_expiry__range=(today, next_30))
 
+@api_view(['GET'])
+def employee_list(request):
+    division    = request.GET.get("division")
+    status      = request.GET.get("status")
+    search      = request.GET.get("search")
+    designation = request.GET.get("designation")
+    nationality = request.GET.get("nationality")
+    expiry_alert = request.GET.get("expiry_alert")
+    joined_from = request.GET.get("joined_from")
+    joined_to   = request.GET.get("joined_to")
+
+    employees = Employee.objects.all()
+
+    if search:
+        employees = employees.filter(
+            Q(emp_id__icontains=search) | Q(name__icontains=search)
+        )
+    if division:
+        employees = employees.filter(division__name=division)
+    if status == "active":
+        employees = employees.filter(is_active=True)
+    elif status == "inactive":
+        employees = employees.filter(is_active=False)
+
+    # 🆕 Designation
+    if designation:
+        employees = employees.filter(
+            Q(designation_aug__icontains=designation) |
+            Q(designation_ipa__icontains=designation)
+        )
+
+    # 🆕 Nationality
+    if nationality:
+        employees = employees.filter(nationality__icontains=nationality)
+
+    # 🆕 Expiry Alert (30 days)
+    if expiry_alert:
+        today = date.today()
+        next_30 = today + timedelta(days=30)
+        if expiry_alert == "wp":
+            employees = employees.filter(wp_expiry__range=(today, next_30))
+        elif expiry_alert == "passport":
+            employees = employees.filter(passport_expiry__range=(today, next_30))
+
     # 🆕 Date Range (joined / doa)
     if joined_from:
         employees = employees.filter(doa__gte=joined_from)
     if joined_to:
         employees = employees.filter(doa__lte=joined_to)
 
+    # Pagination
+    paginator = PageNumberPagination()
+    paginator.page_size = int(request.GET.get('page_size', 15))
+    result_page = paginator.paginate_queryset(employees, request)
+
     data = []
-    for e in employees:
+    for e in result_page:
         data.append({
             "emp_id": e.emp_id,
             "name": e.name,
             "phone": e.phone,
             "designation": e.designation_aug,
             "division": e.division.name,
-            "status": "Active" if e.is_active else "Inactive"
+            "status": "Active" if e.is_active else "Inactive",
+            "salary": e.ipa_salary  # Add salary field for editing
         })
 
-    return Response(data)
+    return paginator.get_paginated_response(data)
 
 @api_view(['GET'])
 def employee_detail(request, emp_id):
@@ -390,3 +441,115 @@ def employee_detail(request, emp_id):
 
     except Employee.DoesNotExist:
         return Response({"error": "Employee not found"}, status=404)
+
+
+@api_view(['PUT'])
+def update_employee(request, emp_id):
+    try:
+        print(f"Update request for emp_id: {emp_id}")
+        print(f"Request method: {request.method}")
+        print(f"Request data: {request.data}")
+        print(f"Request content type: {request.content_type}")
+
+        emp = Employee.objects.get(emp_id=emp_id)
+        print(f"Found employee: {emp.name} (ID: {emp.id})")
+
+        # Update only provided fields (partial update)
+        updated_fields = []
+
+        if 'name' in request.data and request.data['name']:
+            emp.name = request.data['name']
+            updated_fields.append('name')
+            print(f"Updating name to: {request.data['name']}")
+
+        if 'phone' in request.data:
+            emp.phone = request.data['phone'] if request.data['phone'] else None
+            updated_fields.append('phone')
+            print(f"Updating phone to: {request.data['phone']}")
+
+        if 'salary' in request.data and request.data['salary']:
+            try:
+                salary_value = float(request.data['salary'])
+                emp.ipa_salary = salary_value
+                updated_fields.append('ipa_salary')
+                print(f"Updating salary to: {salary_value}")
+            except (ValueError, TypeError) as e:
+                print(f"Error converting salary: {e}")
+                return Response({"error": "Invalid salary format"}, status=400)
+
+        if 'designation_ipa' in request.data:
+            emp.designation_ipa = request.data['designation_ipa'] if request.data['designation_ipa'] else None
+            updated_fields.append('designation_ipa')
+            print(f"Updating designation_ipa to: {request.data['designation_ipa']}")
+
+        if 'nationality' in request.data:
+            emp.nationality = request.data['nationality'] if request.data['nationality'] else None
+            updated_fields.append('nationality')
+            print(f"Updating nationality to: {request.data['nationality']}")
+
+        if 'dob' in request.data:
+            if request.data['dob']:
+                try:
+                    from datetime import datetime
+                    emp.dob = datetime.strptime(request.data['dob'], '%Y-%m-%d').date()
+                    updated_fields.append('dob')
+                    print(f"Updating dob to: {request.data['dob']}")
+                except ValueError as e:
+                    print(f"Error parsing dob: {e}")
+                    return Response({"error": "Invalid date format for dob. Use YYYY-MM-DD"}, status=400)
+            else:
+                emp.dob = None
+                updated_fields.append('dob')
+                print("Setting dob to None")
+
+        if 'work_permit_no' in request.data:
+            emp.work_permit_no = request.data['work_permit_no'] if request.data['work_permit_no'] else None
+            updated_fields.append('work_permit_no')
+            print(f"Updating work_permit_no to: {request.data['work_permit_no']}")
+
+        if 'fin_no' in request.data:
+            emp.fin_no = request.data['fin_no'] if request.data['fin_no'] else None
+            updated_fields.append('fin_no')
+            print(f"Updating fin_no to: {request.data['fin_no']}")
+
+        if 'passport_no' in request.data:
+            emp.passport_no = request.data['passport_no'] if request.data['passport_no'] else None
+            updated_fields.append('passport_no')
+            print(f"Updating passport_no to: {request.data['passport_no']}")
+
+        if 'qualification' in request.data:
+            emp.qualification = request.data['qualification'] if request.data['qualification'] else None
+            updated_fields.append('qualification')
+            print(f"Updating qualification to: {request.data['qualification']}")
+
+        if 'accommodation' in request.data:
+            emp.accommodation = request.data['accommodation'] if request.data['accommodation'] else None
+            updated_fields.append('accommodation')
+            print(f"Updating accommodation to: {request.data['accommodation']}")
+
+        if 'remarks' in request.data:
+            emp.remarks = request.data['remarks'] if request.data['remarks'] else None
+            updated_fields.append('remarks')
+            print(f"Updating remarks to: {request.data['remarks']}")
+
+        if not updated_fields:
+            return Response({"error": "No valid fields to update"}, status=400)
+
+        emp.save()
+        print(f"Employee saved successfully. Updated fields: {updated_fields}")
+
+        return Response({
+            "message": "Employee updated successfully",
+            "updated_fields": updated_fields
+        })
+
+    except Employee.DoesNotExist:
+        print(f"Employee not found: {emp_id}")
+        available_ids = list(Employee.objects.values_list('emp_id', flat=True)[:10])
+        print(f"Available emp_ids: {available_ids}")
+        return Response({"error": f"Employee not found: {emp_id}"}, status=404)
+    except Exception as e:
+        print(f"Error updating employee: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({"error": str(e)}, status=400)
