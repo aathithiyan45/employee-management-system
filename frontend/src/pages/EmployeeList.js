@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../axiosInstance";
 import "./EmployeeList.css";
 
 function EmployeeList() {
@@ -11,7 +11,12 @@ function EmployeeList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(15);
   const [loading, setLoading] = useState(false);
-  const [division, setDivision] = useState("");
+  // Initialize division from localStorage, URL params, or default to "all"
+  const [division, setDivision] = useState(
+    new URLSearchParams(window.location.search).get("division") ||
+      localStorage.getItem("selectedEmployeeListDivision") ||
+      "all",
+  );
   const [divisions, setDivisions] = useState([]);
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -23,16 +28,38 @@ function EmployeeList() {
   const [expiryAlert, setExpiryAlert] = useState("");
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
+  const [incomplete, setIncomplete] = useState("");
+
+  // ── Parse URL parameters on mount ──────────────────────
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+
+    const divisionParam = urlParams.get("division");
+    const statusParam = urlParams.get("status");
+    const expiryAlertParam = urlParams.get("expiry_alert");
+    const incompleteParam = urlParams.get("incomplete");
+
+    // Set division from URL or default to "all"
+    if (divisionParam) {
+      setDivision(divisionParam);
+    } else {
+      setDivision("all");
+    }
+    if (statusParam) setStatus(statusParam);
+    if (expiryAlertParam) setExpiryAlert(expiryAlertParam);
+    if (incompleteParam) setIncomplete(incompleteParam);
+  }, []);
 
   // ── Edit Employee States ──────────────────────────────────
   // Removed editEmployee and formData states - now using profile page
 
   // ── Fetch Employees Function ─────────────────────────────
-  const fetchEmployees = () => {
+  const fetchEmployees = useCallback(() => {
+    // Allow "all" divisions or specific division names
     if (!division) return;
     setLoading(true);
-    axios
-      .get("http://127.0.0.1:8000/api/employees/", {
+    api
+      .get("employees/", {
         params: {
           division,
           status,
@@ -42,6 +69,7 @@ function EmployeeList() {
           expiry_alert: expiryAlert,
           joined_from: joinedFrom,
           joined_to: joinedTo,
+          incomplete,
           page: currentPage,
           page_size: pageSize,
         },
@@ -55,22 +83,6 @@ function EmployeeList() {
         console.log(err);
         setLoading(false);
       });
-  };
-
-  // ── Fetch Divisions ────────────────────────────────────
-  useEffect(() => {
-    axios
-      .get("http://127.0.0.1:8000/api/divisions/")
-      .then((res) => {
-        setDivisions(res.data);
-        if (res.data.length > 0) setDivision(res.data[0].name);
-      })
-      .catch((err) => console.log(err));
-  }, []);
-
-  // ── Fetch Employees ────────────────────────────────────
-  useEffect(() => {
-    fetchEmployees();
   }, [
     division,
     status,
@@ -80,9 +92,32 @@ function EmployeeList() {
     expiryAlert,
     joinedFrom,
     joinedTo,
+    incomplete,
     currentPage,
     pageSize,
   ]);
+
+  // ── Fetch Divisions ────────────────────────────────────
+  useEffect(() => {
+    api
+      .get("divisions/")
+      .then((res) => {
+        setDivisions(res.data);
+      })
+      .catch((err) => console.log(err));
+  }, []);
+
+  // ── Save selected division to localStorage ────────────────
+  useEffect(() => {
+    if (division) {
+      localStorage.setItem("selectedEmployeeListDivision", division);
+    }
+  }, [division]);
+
+  // ── Fetch Employees ────────────────────────────────────
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
 
   const hasActiveFilters =
     designation || nationality || expiryAlert || joinedFrom || joinedTo;
@@ -130,7 +165,7 @@ function EmployeeList() {
               value={division}
               onChange={(e) => setDivision(e.target.value)}
             >
-              <option value="">All Divisions</option>
+              <option value="all">All Divisions</option>
               {divisions.map((d) => (
                 <option key={d.id} value={d.name}>
                   {d.name}

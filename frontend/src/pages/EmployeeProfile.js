@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../axiosInstance";
 import "./EmployeeProfile.css";
 
 function EmployeeProfile() {
@@ -16,9 +16,7 @@ function EmployeeProfile() {
   const fetchEmployee = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `http://127.0.0.1:8000/api/employee/${empId}/`,
-      );
+      const response = await api.get(`employee/${empId}/`);
       setEmployee(response.data);
       setFormData({
         name: response.data.name || "",
@@ -65,15 +63,11 @@ function EmployeeProfile() {
   const saveField = async (field) => {
     try {
       const updateData = { [field]: formData[field] };
-      await axios.put(
-        `http://127.0.0.1:8000/api/employee/update/${empId}/`,
-        updateData,
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
+      await api.put(`employee/update/${empId}/`, updateData, {
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+      });
 
       // Update local state
       setEmployee({ ...employee, [field]: formData[field] });

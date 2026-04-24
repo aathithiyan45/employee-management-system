@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "../axiosInstance";
 
 function SearchEmployee() {
   const [empId, setEmpId] = useState("");
@@ -7,9 +7,7 @@ function SearchEmployee() {
 
   const searchEmployee = async () => {
     try {
-      const res = await axios.get(
-        `http://127.0.0.1:8000/api/employee/${empId}/`
-      );
+      const res = await api.get(`employee/${empId}/`);
       setEmployee(res.data);
     } catch (err) {
       alert("Employee not found");
