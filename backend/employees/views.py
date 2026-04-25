@@ -15,8 +15,6 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_simplejwt.tokens import RefreshToken
-# views.py
-from .models import LeaveBalance
 
 from .models import (
     Employee, Division, User,
@@ -24,12 +22,16 @@ from .models import (
 )
 
 
-# =========================
-# 🔧 SAFE DATE PARSER
-# =========================
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+
 def safe_date(value):
+    """Parse any date value from Excel safely."""
     try:
-        if pd.isna(value) or value == "":
+        if value is None or value == "":
+            return None
+        if pd.isna(value):
             return None
         d = pd.to_datetime(value, errors="coerce", dayfirst=True)
         return d.date() if not pd.isna(d) else None
@@ -37,10 +39,8 @@ def safe_date(value):
         return None
 
 
-# =========================
-# 🔧 SAFE GET
-# =========================
 def safe_get(row, key):
+    """Get string value from row safely."""
     val = row.get(key)
     try:
         if pd.isna(val) or val is None:
@@ -50,9 +50,32 @@ def safe_get(row, key):
     return str(val).strip() if val is not None else ""
 
 
-# =========================
-# 🔐 LOGIN
-# =========================
+def safe_float(val):
+    """Parse float, return None if invalid."""
+    try:
+        f = float(val)
+        return f if f > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def safe_bool(val):
+    """Parse boolean from 0/1/True/False/Yes/No."""
+    if val is None or val == "":
+        return False
+    try:
+        if isinstance(val, bool):
+            return val
+        s = str(val).strip().lower()
+        return s in ("1", "true", "yes", "y")
+    except Exception:
+        return False
+
+
+# ─────────────────────────────────────────────
+# AUTH
+# ─────────────────────────────────────────────
+
 @api_view(['POST'])
 def login_view(request):
     username_input = request.data.get("username")
@@ -67,7 +90,6 @@ def login_view(request):
     user = authenticate(username=username_input, password=password)
 
     if user is None:
-        # Fallback: look up by username (redundant but kept for compatibility)
         try:
             emp_user = User.objects.get(username=username_input)
             user = authenticate(username=emp_user.username, password=password)
@@ -75,7 +97,7 @@ def login_view(request):
             pass
 
     if user:
-        emp = getattr(user, "employee_profile", None)   # FIX: correct related_name
+        emp = getattr(user, "employee_profile", None)
         refresh = RefreshToken.for_user(user)
 
         return Response({
@@ -91,9 +113,10 @@ def login_view(request):
     return Response({"status": "error", "message": "Invalid credentials"}, status=401)
 
 
-# =========================
-# 📊 DASHBOARD
-# =========================
+# ─────────────────────────────────────────────
+# DASHBOARD
+# ─────────────────────────────────────────────
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def dashboard_view(request):
@@ -102,8 +125,10 @@ def dashboard_view(request):
     if not division_name:
         return Response({"error": "Division required"}, status=400)
 
-    today = date.today()
+    today        = date.today()
     next_30_days = today + timedelta(days=30)
+    next_60_days = today + timedelta(days=60)
+    next_90_days = today + timedelta(days=90)
 
     if division_name == "all":
         employees = Employee.objects.all()
@@ -117,19 +142,20 @@ def dashboard_view(request):
     active_employees = employees.filter(is_active=True)
 
     wp_expiring = active_employees.filter(
-        wp_expiry__range=(today, next_30_days)
+        wp_expiry__range=(today, next_60_days)
     ).count()
 
     passport_expiring = active_employees.filter(
-        passport_expiry__range=(today, next_30_days)
+        passport_expiry__range=(today, next_90_days)
     ).count()
 
     incomplete_profiles = employees.filter(
-        Q(phone__isnull=True)        | Q(phone="") |
-        Q(nationality__isnull=True)  | Q(nationality="") |
-        Q(dob__isnull=True) |
-        Q(passport_no__isnull=True)  | Q(passport_no="") |
-        Q(work_permit_no__isnull=True) | Q(work_permit_no="")
+        Q(phone__isnull=True)          | Q(phone="") |
+        Q(nationality__isnull=True)    | Q(nationality="") |
+        Q(dob__isnull=True)            |
+        Q(passport_no__isnull=True)    | Q(passport_no="") |
+        Q(work_permit_no__isnull=True) | Q(work_permit_no="") |
+        Q(date_joined_company__isnull=True)
     ).count()
 
     return Response({
@@ -142,13 +168,13 @@ def dashboard_view(request):
     })
 
 
-# =========================
-# 📈 CHARTS DATA
-# =========================
+# ─────────────────────────────────────────────
+# CHARTS
+# ─────────────────────────────────────────────
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def chart_division_distribution(request):
-    """Division distribution pie chart data."""
     division_param = request.GET.get("division")
 
     if division_param and division_param != "all":
@@ -179,7 +205,6 @@ def chart_division_distribution(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def chart_monthly_growth(request):
-    """Monthly employee growth for last 12 months."""
     from django.db.models.functions import TruncMonth
 
     division_param = request.GET.get("division")
@@ -231,7 +256,6 @@ def chart_monthly_growth(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def chart_designation_breakdown(request):
-    """Top-10 designation breakdown pie chart data."""
     division_param = request.GET.get("division")
 
     if division_param and division_param != "all":
@@ -262,163 +286,161 @@ def chart_designation_breakdown(request):
     })
 
 
-# =========================
-# 📂 EXCEL IMPORT
-# =========================
+# ─────────────────────────────────────────────
+# EXCEL IMPORT  ← FULL UPDATED VERSION
+# ─────────────────────────────────────────────
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def import_excel(request):
-    if request.user.role != 'admin':
-        return Response({"error": "Admin access only"}, status=403)
+    """
+    Single Excel upload.
+    IS_ACTIVE column: 1 = active (current), 0 = inactive (cancelled).
+    If IS_ACTIVE column is missing → defaults to True (active).
+    EMP ID is the only required column. All others are optional.
+    """
+    if request.user.role not in ('admin', 'hr'):
+        return Response({"error": "Admin or HR access only"}, status=403)
 
     file = request.FILES.get('file')
     if not file:
         return Response({"error": "No file uploaded"}, status=400)
 
-    sheet_type = request.data.get("sheet_type", "current")
-
     try:
-        excel = pd.ExcelFile(file)
-        df    = pd.read_excel(excel, sheet_name=0)
+        df = pd.read_excel(file, sheet_name=0, dtype=str)
     except Exception as e:
         return Response({"error": f"Excel read failed — {e}"}, status=400)
 
+    # Normalise column names
     df.columns = df.columns.str.strip()
-    df = df.fillna("")
+    df = df.where(pd.notnull(df), None)
 
-    created    = 0
-    updated    = 0
-    inactivated = 0
-    skipped    = 0
+    created = 0
+    updated = 0
+    skipped = 0
+    errors  = []
 
-    # ── CURRENT EMPLOYEES ────────────────────
-    if sheet_type == "current":
-        for _, row in df.iterrows():
-            emp_id = safe_get(row, "EMP ID")
-            if not emp_id:
-                skipped += 1
-                continue
+    for idx, row in df.iterrows():
+        row = row.to_dict()
 
-            company = safe_get(row, "COMPANY").strip().upper() or "UNKNOWN"
-            division, _ = Division.objects.get_or_create(name=company)
+        # ── EMP ID (required) ──────────────────────────
+        emp_id = safe_get(row, "EMP ID")
+        if not emp_id:
+            skipped += 1
+            continue
 
+        # ── IS_ACTIVE ──────────────────────────────────
+        raw_active = row.get("IS_ACTIVE")
+        if raw_active is None or str(raw_active).strip() == "":
+            is_active = True          # default: active if column missing
+        else:
+            is_active = safe_bool(raw_active)
+
+        # ── DIVISION ───────────────────────────────────
+        company  = safe_get(row, "COMPANY").strip().upper() or "UNKNOWN"
+        division, _ = Division.objects.get_or_create(name=company)
+
+        # ── Build defaults dict ────────────────────────
+        defaults = {
+            # Basic
+            "name":          safe_get(row, "NAME") or f"EMP-{emp_id}",
+            "phone":         safe_get(row, "HP NUMBER") or None,
+            "nationality":   safe_get(row, "NATIONALITY") or None,
+            "dob":           safe_date(row.get("D.O.B")),
+            "qualification": safe_get(row, "QUALIFICATION") or None,
+            "division":      division,
+            "is_active":     is_active,
+
+            # Job / Salary
+            "designation_ipa": safe_get(row, "IPA DESIGNATION") or None,
+            "designation_aug": safe_get(row, "Trade") or None,
+            "ipa_salary":      safe_float(row.get("IPA SALARY")),
+            "per_hr":          safe_float(row.get("PER HR")),
+            "salary":          safe_float(row.get("IPA SALARY")),
+
+            # Employment Dates
+            "doa":                 safe_date(row.get("DOA")),
+            "arrival_date":        safe_date(row.get("ARRIVAL DATE")),
+            "date_joined_company": safe_date(row.get("DATE JOINED")),
+
+            # Work Permit / IC
+            "work_permit_no": safe_get(row, "IC / WP NO") or None,
+            "fin_no":         safe_get(row, "FIN NO") or None,
+            "ic_status":      safe_get(row, "IC TYPE") or None,
+            "issue_date":     safe_date(row.get("ISSUANCE DATE")),
+            "wp_expiry":      safe_date(row.get("S PASS/ WP EXPRIY")),
+
+            # Passport
+            "passport_no":     safe_get(row, "PP.NO") or None,
+            "passport_expiry": safe_date(row.get("PP EXPIRY")),
+
+            # Certifications / Safety
+            "ssic_gt_sn":  safe_get(row, "SSIC GT S/N") or None,
+            "ssic_gt_exp": safe_date(row.get("SSIC GT EXP DATE")),
+            "ssic_ht_sn":  safe_get(row, "SSIC HT S/N") or None,
+            "ssic_ht_exp": safe_date(row.get("SSIC HT EXP DATE")),
+
+            "work_at_height":   safe_bool(row.get("WORK-AT-HEIGHT")),
+            "confined_space":   safe_bool(row.get("CONFINED SPACE")),
+            "signalman_rigger": safe_bool(row.get("SIGNALMAN & RIGGER COURSE")),
+            "welder_no":        safe_get(row, "WELDER NO") or None,
+            "lssc_sn":          safe_get(row, "LSSC S/N") or None,
+
+            # Finance / Other
+            "bank_account": safe_get(row, "BANK ACCOUNT NUMBER") or None,
+            "accommodation": safe_get(row, "ACCOMODATION") or None,
+            "pcp_status":    safe_get(row, "PCP STATUS") or None,
+            "remarks":       safe_get(row, "REMARKS") or None,
+        }
+
+        try:
             _, created_flag = Employee.objects.update_or_create(
                 emp_id=emp_id,
-                defaults={
-                    "name":        safe_get(row, "NAME") or f"EMP-{emp_id}",
-                    "phone":       safe_get(row, "HP NUMBER") or None,
-                    "nationality": safe_get(row, "NATIONALITY") or None,
-                    "dob":         safe_date(row.get("D.O.B")),
-                    "division":    division,
-                    "is_active":   True,
-
-                    "designation_ipa": safe_get(row, "IPA DESIGNATION") or None,
-                    "ipa_salary":      row.get("IPA SALARY") or 0,
-                    "per_hr":          row.get("PER HR") or 0,
-                    "designation_aug": safe_get(row, "Trade") or None,
-
-                    "work_permit_no": safe_get(row, "IC / WP NO") or None,
-                    "fin_no":         safe_get(row, "FIN NO") or None,
-                    "issue_date":     safe_date(row.get("ISSUANCE DATE")),
-                    "ic_status":      safe_get(row, "IC TYPE") or None,
-                    "wp_expiry":      safe_date(row.get("S PASS/ WP EXPRIY")),
-
-                    "passport_no":     safe_get(row, "PP.NO") or None,
-                    "passport_expiry": safe_date(row.get("PP EXPIRY")),
-
-                    "ssic_gt_sn":  safe_get(row, "SSIC GT S/N") or None,
-                    "ssic_gt_exp": safe_date(row.get("SSIC GT EXP DATE")),
-                    "ssic_ht_sn":  safe_get(row, "SSIC HT S/N") or None,
-                    "ssic_ht_exp": safe_date(row.get("SSIC HT EXP DATE")),
-
-                    "work_at_height":   bool(row.get("WORK-AT-HEIGHT")),
-                    "confined_space":   bool(row.get("CONFINED SPACE")),
-                    "welder_no":        safe_get(row, "WELDER NO") or None,
-                    "lssc_sn":          safe_get(row, "LSSC S/N") or None,
-                    "signalman_rigger": bool(safe_get(row, "SIGNALMAN & RIGGER COURSE")),
-
-                    "salary":       row.get("IPA SALARY") or 0,
-                    "bank_account": safe_get(row, "BANK ACCOUNT NUMBER") or None,
-
-                    "accommodation": safe_get(row, "ACCOMODATION") or None,
-                    "pcp_status":    safe_get(row, "PCP STATUS") or None,
-                },
+                defaults=defaults,
             )
-
             if created_flag:
                 created += 1
             else:
                 updated += 1
 
-        return Response({
-            "message": "Current employees imported ✅",
-            "created": created,
-            "updated": updated,
-            "skipped": skipped,
-        })
+        except Exception as e:
+            errors.append({
+                "row":    idx + 2,   # Excel row number (1-indexed + header)
+                "emp_id": emp_id,
+                "error":  str(e),
+            })
+            skipped += 1
+            continue
 
-    # ── CANCELLED EMPLOYEES ──────────────────
-    elif sheet_type == "cancelled":
-        for _, row in df.iterrows():
-            emp_id = (
-                safe_get(row, "EMP ID") or
-                safe_get(row, "EM ID")  or
-                safe_get(row, "Emp ID")
-            )
-            if not emp_id:
-                skipped += 1
-                continue
+    response_data = {
+        "message": "Import completed",
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "total_rows": created + updated + skipped,
+    }
+    if errors:
+        response_data["errors"] = errors[:20]   # max 20 errors returned
 
-            company  = safe_get(row, "COMPANY").strip().upper() or "UNKNOWN"
-            division, _ = Division.objects.get_or_create(name=company)
-
-            name = (
-                safe_get(row, "NAME") or
-                safe_get(row, "Name") or
-                f"EMP-{emp_id}"
-            )
-
-            _, created_flag = Employee.objects.update_or_create(
-                emp_id=emp_id,
-                defaults={
-                    "name":      name,
-                    "division":  division,
-                    "is_active": False,
-                },
-            )
-
-            if not created_flag:
-                inactivated += 1
-            else:
-                created += 1
-
-        return Response({
-            "message":     "Cancelled employees imported ✅",
-            "inactivated": inactivated,
-            "created":     created,
-            "skipped":     skipped,
-        })
-
-    return Response(
-        {"error": "Invalid sheet_type. Use 'current' or 'cancelled'"},
-        status=400,
-    )
+    return Response(response_data)
 
 
-# =========================
-# 🧹 CLEAR DB  ⚠️  REMOVE BEFORE PRODUCTION
-# =========================
+# ─────────────────────────────────────────────
+# CLEAR DB  ⚠️  REMOVE BEFORE PRODUCTION
+# ─────────────────────────────────────────────
+
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated, IsAdminUser])   # FIX: was open GET with no auth
+@permission_classes([IsAuthenticated, IsAdminUser])
 def clear_db(request):
     Employee.objects.all().delete()
     Division.objects.all().delete()
     return Response({"message": "DB cleaned"})
 
 
-# =========================
-# 🏢 DIVISIONS
-# =========================
+# ─────────────────────────────────────────────
+# DIVISIONS
+# ─────────────────────────────────────────────
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_divisions(request):
@@ -426,9 +448,10 @@ def get_divisions(request):
     return Response(list(divisions))
 
 
-# =========================
-# 👥 EMPLOYEE LIST
-# =========================
+# ─────────────────────────────────────────────
+# EMPLOYEE LIST
+# ─────────────────────────────────────────────
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def employee_list(request):
@@ -442,7 +465,7 @@ def employee_list(request):
     joined_to    = request.GET.get("joined_to")
     incomplete   = request.GET.get("incomplete")
 
-    employees = Employee.objects.select_related("division").all()  # FIX: add select_related
+    employees = Employee.objects.select_related("division").all()
 
     if search:
         employees = employees.filter(
@@ -463,24 +486,24 @@ def employee_list(request):
         employees = employees.filter(nationality__icontains=nationality)
     if expiry_alert:
         today   = date.today()
-        next_30 = today + timedelta(days=30)
+        next_60 = today + timedelta(days=60)
+        next_90 = today + timedelta(days=90)
         if expiry_alert == "wp":
-            employees = employees.filter(wp_expiry__range=(today, next_30))
+            employees = employees.filter(wp_expiry__range=(today, next_60))
         elif expiry_alert == "passport":
-            employees = employees.filter(passport_expiry__range=(today, next_30))
+            employees = employees.filter(passport_expiry__range=(today, next_90))
     if joined_from:
-        employees = employees.filter(doa__gte=joined_from)
+        employees = employees.filter(date_joined_company__gte=joined_from)
     if joined_to:
-        employees = employees.filter(doa__lte=joined_to)
-
-    # FIX: incomplete filter must come before pagination
+        employees = employees.filter(date_joined_company__lte=joined_to)
     if incomplete == "true":
         employees = employees.filter(
-            Q(phone__isnull=True)        | Q(phone="") |
-            Q(nationality__isnull=True)  | Q(nationality="") |
-            Q(dob__isnull=True) |
-            Q(passport_no__isnull=True)  | Q(passport_no="") |
-            Q(work_permit_no__isnull=True) | Q(work_permit_no="")
+            Q(phone__isnull=True)          | Q(phone="") |
+            Q(nationality__isnull=True)    | Q(nationality="") |
+            Q(dob__isnull=True)            |
+            Q(passport_no__isnull=True)    | Q(passport_no="") |
+            Q(work_permit_no__isnull=True) | Q(work_permit_no="") |
+            Q(date_joined_company__isnull=True)
         )
 
     paginator = PageNumberPagination()
@@ -489,13 +512,17 @@ def employee_list(request):
 
     data = [
         {
-            "emp_id":      e.emp_id,
-            "name":        e.name,
-            "phone":       e.phone,
-            "designation": e.designation_aug,
-            "division":    e.division.name,
-            "status":      "Active" if e.is_active else "Inactive",
-            "salary":      e.ipa_salary,
+            "emp_id":           e.emp_id,
+            "name":             e.name,
+            "phone":            e.phone,
+            "designation":      e.designation_aug,
+            "division":         e.division.name,
+            "status":           "Active" if e.is_active else "Inactive",
+            "salary":           e.ipa_salary,
+            "date_joined":      e.date_joined_company,
+            "experience_years": e.experience_years,
+            "wp_expiry":        e.wp_expiry,
+            "passport_expiry":  e.passport_expiry,
         }
         for e in result_page
     ]
@@ -503,9 +530,10 @@ def employee_list(request):
     return paginator.get_paginated_response(data)
 
 
-# =========================
-# 👤 EMPLOYEE DETAIL
-# =========================
+# ─────────────────────────────────────────────
+# EMPLOYEE DETAIL
+# ─────────────────────────────────────────────
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def employee_detail(request, emp_id):
@@ -521,14 +549,22 @@ def employee_detail(request, emp_id):
         "phone":       e.phone,
         "nationality": e.nationality,
         "dob":         e.dob,
+        "age":         e.age,
         "division":    e.division.name,
         "status":      "Active" if e.is_active else "Inactive",
+        "qualification": e.qualification,
 
         # Job Info
-        "designation_ipa": e.designation_ipa,
-        "ipa_salary":      e.ipa_salary,
-        "per_hr":          e.per_hr,
-        "designation_aug": e.designation_aug,
+        "designation_ipa":  e.designation_ipa,
+        "designation_aug":  e.designation_aug,
+        "ipa_salary":       e.ipa_salary,
+        "per_hr":           e.per_hr,
+
+        # Employment Dates
+        "doa":                 e.doa,
+        "arrival_date":        e.arrival_date,
+        "date_joined_company": e.date_joined_company,
+        "experience_years":    e.experience_years,   # auto-calculated
 
         # Work Permit / IC
         "work_permit_no": e.work_permit_no,
@@ -536,16 +572,14 @@ def employee_detail(request, emp_id):
         "issue_date":     e.issue_date,
         "ic_status":      e.ic_status,
         "wp_expiry":      e.wp_expiry,
+        "wp_expiring_soon": e.wp_expiring_soon,
 
         # Passport
         "passport_no":          e.passport_no,
         "passport_expiry":      e.passport_expiry,
         "passport_issue_date":  e.passport_issue_date,
         "passport_issue_place": e.passport_issue_place,
-
-        # Dates
-        "doa":          e.doa,
-        "arrival_date": e.arrival_date,
+        "passport_expiring_soon": e.passport_expiring_soon,
 
         # Certifications / Safety
         "ssic_gt_sn":  e.ssic_gt_sn,
@@ -571,7 +605,6 @@ def employee_detail(request, emp_id):
         "bank_account": e.bank_account,
 
         # Other
-        "qualification":     e.qualification,
         "accommodation":     e.accommodation,
         "pcp_status":        e.pcp_status,
         "security_bond_no":  e.security_bond_no,
@@ -580,9 +613,10 @@ def employee_detail(request, emp_id):
     })
 
 
-# =========================
-# 📥 EXPORT EMPLOYEES
-# =========================
+# ─────────────────────────────────────────────
+# EXPORT EMPLOYEES
+# ─────────────────────────────────────────────
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_employees(request):
@@ -594,49 +628,41 @@ def export_employees(request):
 
     data = [
         {
-            "emp_id": e.emp_id,
-            "name": e.name,
-            "phone": e.phone,
-            "nationality": e.nationality,
-            "dob": e.dob,
-            "division": e.division.name,
-            "status": "Active" if e.is_active else "Inactive",
-            "designation_ipa": e.designation_ipa,
-            "ipa_salary": e.ipa_salary,
-            "per_hr": e.per_hr,
-            "designation_aug": e.designation_aug,
-            "work_permit_no": e.work_permit_no,
-            "fin_no": e.fin_no,
-            "issue_date": e.issue_date,
-            "ic_status": e.ic_status,
-            "wp_expiry": e.wp_expiry,
-            "passport_no": e.passport_no,
-            "passport_expiry": e.passport_expiry,
-            "passport_issue_date": e.passport_issue_date,
-            "passport_issue_place": e.passport_issue_place,
-            "doa": e.doa,
-            "arrival_date": e.arrival_date,
-            "ssic_gt_sn": e.ssic_gt_sn,
-            "ssic_gt_exp": e.ssic_gt_exp,
-            "ssic_ht_sn": e.ssic_ht_sn,
-            "ssic_ht_exp": e.ssic_ht_exp,
-            "work_at_height": e.work_at_height,
-            "confined_space": e.confined_space,
-            "welder_no": e.welder_no,
-            "lssc_sn": e.lssc_sn,
-            "signalman_rigger": e.signalman_rigger,
-            "firewatchman": e.firewatchman,
-            "gas_meter_carrier": e.gas_meter_carrier,
-            "dynamac_pass_sn": e.dynamac_pass_sn,
-            "dynamac_pass_exp": e.dynamac_pass_exp,
-            "salary": e.salary,
-            "bank_account": e.bank_account,
-            "qualification": e.qualification,
-            "accommodation": e.accommodation,
-            "pcp_status": e.pcp_status,
-            "security_bond_no": e.security_bond_no,
-            "security_bond_exp": e.security_bond_exp,
-            "remarks": e.remarks,
+            "EMP ID":            e.emp_id,
+            "IS_ACTIVE":         1 if e.is_active else 0,
+            "NAME":              e.name,
+            "HP NUMBER":         e.phone,
+            "NATIONALITY":       e.nationality,
+            "D.O.B":             e.dob,
+            "COMPANY":           e.division.name,
+            "IPA DESIGNATION":   e.designation_ipa,
+            "Trade":             e.designation_aug,
+            "IPA SALARY":        e.ipa_salary,
+            "PER HR":            e.per_hr,
+            "DOA":               e.doa,
+            "ARRIVAL DATE":      e.arrival_date,
+            "DATE JOINED":       e.date_joined_company,
+            "EXPERIENCE YEARS":  e.experience_years,
+            "IC / WP NO":        e.work_permit_no,
+            "FIN NO":            e.fin_no,
+            "IC TYPE":           e.ic_status,
+            "ISSUANCE DATE":     e.issue_date,
+            "S PASS/ WP EXPRIY": e.wp_expiry,
+            "PP.NO":             e.passport_no,
+            "PP EXPIRY":         e.passport_expiry,
+            "SSIC GT S/N":       e.ssic_gt_sn,
+            "SSIC GT EXP DATE":  e.ssic_gt_exp,
+            "SSIC HT S/N":       e.ssic_ht_sn,
+            "SSIC HT EXP DATE":  e.ssic_ht_exp,
+            "WORK-AT-HEIGHT":    1 if e.work_at_height else 0,
+            "CONFINED SPACE":    1 if e.confined_space else 0,
+            "WELDER NO":         e.welder_no,
+            "LSSC S/N":          e.lssc_sn,
+            "SIGNALMAN & RIGGER COURSE": 1 if e.signalman_rigger else 0,
+            "BANK ACCOUNT NUMBER": e.bank_account,
+            "ACCOMODATION":      e.accommodation,
+            "PCP STATUS":        e.pcp_status,
+            "REMARKS":           e.remarks,
         }
         for e in qs
     ]
@@ -644,9 +670,10 @@ def export_employees(request):
     return Response(data)
 
 
-# =========================
-# ✏️ UPDATE EMPLOYEE
-# =========================
+# ─────────────────────────────────────────────
+# UPDATE EMPLOYEE
+# ─────────────────────────────────────────────
+
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_employee(request, emp_id):
@@ -679,8 +706,8 @@ def update_employee(request, emp_id):
 
     # Float fields
     for src_key, field_names in [
-        ('salary',  ['ipa_salary', 'salary']),
-        ('per_hr',  ['per_hr']),
+        ('salary', ['ipa_salary', 'salary']),
+        ('per_hr', ['per_hr']),
     ]:
         if src_key in request.data and request.data[src_key]:
             try:
@@ -694,24 +721,24 @@ def update_employee(request, emp_id):
     # Date fields
     date_fields = [
         'dob', 'issue_date', 'wp_expiry', 'passport_expiry', 'passport_issue_date',
-        'doa', 'arrival_date', 'ssic_gt_exp', 'ssic_ht_exp',
-        'dynamac_pass_exp', 'security_bond_exp',
+        'doa', 'arrival_date', 'date_joined_company',
+        'ssic_gt_exp', 'ssic_ht_exp', 'dynamac_pass_exp', 'security_bond_exp',
     ]
-    for df in date_fields:
-        if df in request.data:
-            raw = request.data[df]
+    for df_field in date_fields:
+        if df_field in request.data:
+            raw = request.data[df_field]
             if raw:
                 try:
-                    setattr(emp, df, datetime.strptime(raw, '%Y-%m-%d').date())
-                    updated_fields.append(df)
+                    setattr(emp, df_field, datetime.strptime(raw, '%Y-%m-%d').date())
+                    updated_fields.append(df_field)
                 except ValueError:
                     return Response(
-                        {"error": f"Invalid date for {df}. Use YYYY-MM-DD"},
+                        {"error": f"Invalid date for {df_field}. Use YYYY-MM-DD"},
                         status=400,
                     )
             else:
-                setattr(emp, df, None)
-                updated_fields.append(df)
+                setattr(emp, df_field, None)
+                updated_fields.append(df_field)
 
     # Boolean fields
     for bf in ['work_at_height', 'confined_space', 'signalman_rigger',
@@ -725,25 +752,24 @@ def update_employee(request, emp_id):
 
     emp.save()
     return Response({
-        "message":        "Employee updated successfully",
-        "updated_fields": updated_fields,
+        "message":          "Employee updated successfully",
+        "updated_fields":   updated_fields,
+        "experience_years": emp.experience_years,
     })
 
 
-# =========================
-# 🏖️ LEAVE — BALANCE
-# =========================
+# ─────────────────────────────────────────────
+# LEAVE — BALANCE
+# ─────────────────────────────────────────────
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def leave_balance(request, emp_id):
-    """Return leave balance for an employee for a given year (default: current)."""
     try:
         emp = Employee.objects.get(emp_id=emp_id)
     except Employee.DoesNotExist:
         return Response({"error": "Employee not found"}, status=404)
 
-    # Employees may only see their own balance; HR/admin see any
     if request.user.role == 'employee':
         profile = getattr(request.user, 'employee_profile', None)
         if not profile or profile.emp_id != emp_id:
@@ -780,10 +806,6 @@ def leave_balance(request, emp_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def leave_balance_adjust(request, emp_id):
-    """
-    Manually adjust (add/deduct) leave balance.
-    HR/Admin only. Creates an audit log entry.
-    """
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "HR or Admin access required"}, status=403)
 
@@ -793,8 +815,8 @@ def leave_balance_adjust(request, emp_id):
         return Response({"error": "Employee not found"}, status=404)
 
     year       = int(request.data.get('year', date.today().year))
-    leave_type = request.data.get('leave_type')          # medical / casual / annual
-    action     = request.data.get('action')              # add / deduct
+    leave_type = request.data.get('leave_type')
+    action     = request.data.get('action')
     days       = request.data.get('days')
     note       = request.data.get('note', '')
 
@@ -826,20 +848,13 @@ def leave_balance_adjust(request, emp_id):
     field = field_map[leave_type]
 
     if action == 'add':
-        # Decrease used (restore balance)
         new_val = max(0, getattr(balance, field) - days)
         setattr(balance, field, new_val)
         log_action = 'manual_add'
     else:
-        # Increase used (deduct balance)
         if not balance.has_sufficient_balance(leave_type, days):
             return Response(
-                {
-                    "error": (
-                        f"Insufficient {leave_type} balance. "
-                        f"Remaining: {balance.get_remaining(leave_type)}"
-                    )
-                },
+                {"error": f"Insufficient {leave_type} balance. Remaining: {balance.get_remaining(leave_type)}"},
                 status=400,
             )
         setattr(balance, field, getattr(balance, field) + days)
@@ -861,19 +876,14 @@ def leave_balance_adjust(request, emp_id):
     })
 
 
-# =========================
-# 🏖️ LEAVE — REQUESTS
-# =========================
+# ─────────────────────────────────────────────
+# LEAVE — REQUESTS
+# ─────────────────────────────────────────────
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def leave_request_list(request):
-    """
-    GET  — List leave requests (filtered by role).
-    POST — Create a new leave request.
-    """
     if request.method == 'GET':
-        # Employees see only their own; HR/admin see all (with optional filters)
         if request.user.role == 'employee':
             profile = getattr(request.user, 'employee_profile', None)
             if not profile:
@@ -905,32 +915,31 @@ def leave_request_list(request):
 
         data = [
             {
-                "id":          lr.id,
-                "emp_id":      lr.employee.emp_id,
-                "emp_name":    lr.employee.name,
-                "leave_type":  lr.get_leave_type_display(),
-                "start_date":  lr.start_date,
-                "end_date":    lr.end_date,
-                "total_days":  lr.total_days,
-                "status":      lr.get_status_display(),
-                "reason":      lr.reason,
-                "reviewed_by": lr.reviewed_by.username if lr.reviewed_by else None,
-                "reviewed_at": lr.reviewed_at,
+                "id":               lr.id,
+                "emp_id":           lr.employee.emp_id,
+                "emp_name":         lr.employee.name,
+                "leave_type":       lr.get_leave_type_display(),
+                "start_date":       lr.start_date,
+                "end_date":         lr.end_date,
+                "total_days":       lr.total_days,
+                "status":           lr.get_status_display(),
+                "reason":           lr.reason,
+                "reviewed_by":      lr.reviewed_by.username if lr.reviewed_by else None,
+                "reviewed_at":      lr.reviewed_at,
                 "rejection_reason": lr.rejection_reason,
-                "created_at":  lr.created_at,
+                "created_at":       lr.created_at,
             }
             for lr in result_page
         ]
         return paginator.get_paginated_response(data)
 
-    # ── POST: create leave request ──
+    # POST
     if request.user.role == 'employee':
         profile = getattr(request.user, 'employee_profile', None)
         if not profile:
             return Response({"error": "No employee profile linked"}, status=400)
         employee = profile
     else:
-        # HR/admin can submit on behalf of an employee
         emp_id = request.data.get('emp_id')
         if not emp_id:
             return Response({"error": "emp_id is required"}, status=400)
@@ -956,7 +965,6 @@ def leave_request_list(request):
     if leave_type not in dict(LeaveRequest.LEAVE_TYPE_CHOICES):
         return Response({"error": "Invalid leave_type"}, status=400)
 
-    # Check balance for paid leave types before creating
     if leave_type != LeaveRequest.LEAVE_UNPAID:
         try:
             balance = LeaveBalance.objects.get(employee=employee, year=start_date.year)
@@ -968,13 +976,7 @@ def leave_request_list(request):
         total_days = (end_date - start_date).days + 1
         if not balance.has_sufficient_balance(leave_type, total_days):
             return Response(
-                {
-                    "error": (
-                        f"Insufficient {leave_type} balance. "
-                        f"Remaining: {balance.get_remaining(leave_type)}, "
-                        f"Requested: {total_days}"
-                    )
-                },
+                {"error": f"Insufficient {leave_type} balance. Remaining: {balance.get_remaining(leave_type)}, Requested: {total_days}"},
                 status=400,
             )
 
@@ -986,10 +988,9 @@ def leave_request_list(request):
             end_date=end_date,
             reason=reason,
         )
-        # Attach file if present
         if 'attachment' in request.FILES:
             lr.attachment = request.FILES['attachment']
-        lr.save()   # triggers full_clean → overlap check & total_days calc
+        lr.save()
     except ValidationError as e:
         return Response({"error": str(e)}, status=400)
 
@@ -1007,15 +1008,11 @@ def leave_request_list(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def leave_request_detail(request, pk):
-    """Return detail of a single leave request."""
     try:
-        lr = LeaveRequest.objects.select_related(
-            'employee', 'reviewed_by'
-        ).get(pk=pk)
+        lr = LeaveRequest.objects.select_related('employee', 'reviewed_by').get(pk=pk)
     except LeaveRequest.DoesNotExist:
         return Response({"error": "Leave request not found"}, status=404)
 
-    # Permission check: employees can only see their own
     if request.user.role == 'employee':
         profile = getattr(request.user, 'employee_profile', None)
         if not profile or profile.id != lr.employee.id:
@@ -1043,7 +1040,6 @@ def leave_request_detail(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def leave_request_approve(request, pk):
-    """Approve a pending leave request. HR/Admin only."""
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "HR or Admin access required"}, status=403)
 
@@ -1052,18 +1048,12 @@ def leave_request_approve(request, pk):
     except LeaveRequest.DoesNotExist:
         return Response({"error": "Leave request not found"}, status=404)
 
-    # FIX: guard against missing LeaveBalance
     if lr.leave_type != LeaveRequest.LEAVE_UNPAID:
         try:
             LeaveBalance.objects.get(employee=lr.employee, year=lr.start_date.year)
         except LeaveBalance.DoesNotExist:
             return Response(
-                {
-                    "error": (
-                        f"No leave balance record for {lr.start_date.year}. "
-                        "Create one via the balance adjust endpoint first."
-                    )
-                },
+                {"error": f"No leave balance record for {lr.start_date.year}. Create one first."},
                 status=400,
             )
 
@@ -1078,7 +1068,6 @@ def leave_request_approve(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def leave_request_reject(request, pk):
-    """Reject a pending leave request. HR/Admin only."""
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "HR or Admin access required"}, status=403)
 
@@ -1087,10 +1076,8 @@ def leave_request_reject(request, pk):
     except LeaveRequest.DoesNotExist:
         return Response({"error": "Leave request not found"}, status=404)
 
-    reason = request.data.get('reason', '')
-
     try:
-        lr.reject(reviewed_by=request.user, reason=reason)
+        lr.reject(reviewed_by=request.user, reason=request.data.get('reason', ''))
     except ValidationError as e:
         return Response({"error": str(e)}, status=400)
 
@@ -1100,10 +1087,6 @@ def leave_request_reject(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def leave_request_cancel(request, pk):
-    """
-    Cancel a leave request.
-    Employees can cancel their own; HR/Admin can cancel any.
-    """
     try:
         lr = LeaveRequest.objects.select_related('employee').get(pk=pk)
     except LeaveRequest.DoesNotExist:
@@ -1122,17 +1105,13 @@ def leave_request_cancel(request, pk):
     return Response({"message": "Leave request cancelled", "id": lr.id})
 
 
-# =========================
-# 📋 LEAVE — AUDIT LOG
-# =========================
+# ─────────────────────────────────────────────
+# LEAVE — AUDIT LOG
+# ─────────────────────────────────────────────
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def leave_audit_log(request):
-    """
-    Return leave adjustment audit log.
-    HR/Admin see all; employees see their own.
-    """
     if request.user.role == 'employee':
         profile = getattr(request.user, 'employee_profile', None)
         if not profile:

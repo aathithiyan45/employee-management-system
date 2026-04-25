@@ -102,7 +102,7 @@ class Employee(models.Model):
 
     # ── Employment Dates
     doa                  = models.DateField(blank=True, null=True, verbose_name="Date of Arrival")
-    arrival_date         = models.DateField(blank=True, null=True)
+    arrival_date         = models.DateField(blank=True, null=True, verbose_name="Arrival Date")
     date_joined_company  = models.DateField(blank=True, null=True, verbose_name="Company Join Date")
 
     # ── Work Permit / IC
@@ -124,14 +124,14 @@ class Employee(models.Model):
     ssic_ht_sn  = models.CharField(max_length=100, blank=True, null=True)
     ssic_ht_exp = models.DateField(blank=True, null=True)
 
-    work_at_height  = models.BooleanField(default=False)
-    confined_space  = models.BooleanField(default=False)
+    work_at_height   = models.BooleanField(default=False)
+    confined_space   = models.BooleanField(default=False)
     signalman_rigger = models.BooleanField(default=False)
-    firewatchman    = models.BooleanField(default=False)
+    firewatchman     = models.BooleanField(default=False)
     gas_meter_carrier = models.BooleanField(default=False)
 
-    welder_no   = models.CharField(max_length=100, blank=True, null=True)
-    lssc_sn     = models.CharField(max_length=100, blank=True, null=True)
+    welder_no = models.CharField(max_length=100, blank=True, null=True)
+    lssc_sn   = models.CharField(max_length=100, blank=True, null=True)
 
     # ── Project Pass
     dynamac_pass_sn  = models.CharField(max_length=100, blank=True, null=True)
@@ -163,6 +163,7 @@ class Employee(models.Model):
             models.Index(fields=['is_active', 'division']),
             models.Index(fields=['wp_expiry']),
             models.Index(fields=['passport_expiry']),
+            models.Index(fields=['date_joined_company']),
         ]
 
     def __str__(self):
@@ -180,6 +181,7 @@ class Employee(models.Model):
 
     @property
     def experience_years(self):
+        """Auto-calculated from date_joined_company. No Excel column needed."""
         if self.date_joined_company:
             today = date.today()
             delta = today - self.date_joined_company
@@ -218,12 +220,12 @@ class LeaveBalance(models.Model):
     )
     year = models.PositiveIntegerField(default=timezone.now().year)
 
-    # Entitlement (set at start of year or on joining)
+    # Entitlement
     medical_entitled = models.IntegerField(default=14)
     casual_entitled  = models.IntegerField(default=7)
     annual_entitled  = models.IntegerField(default=14)
 
-    # Remaining (decremented on approval)
+    # Used (decremented on approval)
     medical_used = models.IntegerField(default=0)
     casual_used  = models.IntegerField(default=0)
     annual_used  = models.IntegerField(default=0)
@@ -239,7 +241,6 @@ class LeaveBalance(models.Model):
     def __str__(self):
         return f"{self.employee.emp_id} | {self.year}"
 
-    # ── Remaining helpers
     @property
     def medical_remaining(self):
         return self.medical_entitled - self.medical_used
@@ -263,7 +264,6 @@ class LeaveBalance(models.Model):
         return self.get_remaining(leave_type) >= days
 
     def deduct(self, leave_type: str, days: int):
-        """Deduct leave days. Call inside approved leave signal/view."""
         field_map = {
             'medical': 'medical_used',
             'casual':  'casual_used',
@@ -281,7 +281,6 @@ class LeaveBalance(models.Model):
         self.save(update_fields=[field, 'updated_at'])
 
     def restore(self, leave_type: str, days: int):
-        """Restore leave days when request is cancelled/rejected after approval."""
         field_map = {
             'medical': 'medical_used',
             'casual':  'casual_used',
@@ -300,9 +299,9 @@ class LeaveBalance(models.Model):
 
 class LeaveRequest(models.Model):
 
-    STATUS_PENDING  = 'pending'
-    STATUS_APPROVED = 'approved'
-    STATUS_REJECTED = 'rejected'
+    STATUS_PENDING   = 'pending'
+    STATUS_APPROVED  = 'approved'
+    STATUS_REJECTED  = 'rejected'
     STATUS_CANCELLED = 'cancelled'
 
     STATUS_CHOICES = (
@@ -324,20 +323,15 @@ class LeaveRequest(models.Model):
         (LEAVE_UNPAID,  'Unpaid Leave'),
     )
 
-    # ── Core
     employee   = models.ForeignKey(
         Employee,
         on_delete=models.CASCADE,
         related_name='leave_requests'
     )
     leave_type = models.CharField(max_length=20, choices=LEAVE_TYPE_CHOICES)
-
-    # ── Dates
     start_date = models.DateField()
     end_date   = models.DateField()
     total_days = models.PositiveIntegerField()
-
-    # ── Details
     reason     = models.TextField(blank=True, null=True)
     attachment = models.FileField(
         upload_to='leave_attachments/%Y/%m/',
@@ -345,7 +339,6 @@ class LeaveRequest(models.Model):
         help_text="Medical certificate or supporting document"
     )
 
-    # ── Status flow
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -353,17 +346,15 @@ class LeaveRequest(models.Model):
         db_index=True
     )
 
-    # ── Admin action
-    reviewed_by     = models.ForeignKey(
+    reviewed_by      = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='reviewed_leaves'
     )
-    reviewed_at     = models.DateTimeField(null=True, blank=True)
+    reviewed_at      = models.DateTimeField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True, null=True)
 
-    # ── Audit
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -385,13 +376,11 @@ class LeaveRequest(models.Model):
             f"{self.get_status_display()}"
         )
 
-    # ── Validation
     def clean(self):
         if self.start_date and self.end_date:
             if self.end_date < self.start_date:
                 raise ValidationError("End date cannot be before start date.")
 
-        # Overlap check: same employee cannot have two approved/pending leaves on same dates
         overlapping = LeaveRequest.objects.filter(
             employee=self.employee,
             status__in=[self.STATUS_PENDING, self.STATUS_APPROVED],
@@ -405,13 +394,11 @@ class LeaveRequest(models.Model):
             )
 
     def save(self, *args, **kwargs):
-        # Auto-calculate total_days if not set
         if self.start_date and self.end_date and not self.total_days:
             self.total_days = (self.end_date - self.start_date).days + 1
         self.full_clean()
         super().save(*args, **kwargs)
 
-    # ── State helpers
     @property
     def is_pending(self):
         return self.status == self.STATUS_PENDING
@@ -422,14 +409,12 @@ class LeaveRequest(models.Model):
 
     @property
     def is_active_leave(self):
-        """True if approved leave is currently ongoing."""
         return (
             self.status == self.STATUS_APPROVED
             and self.start_date <= date.today() <= self.end_date
         )
 
     def approve(self, reviewed_by: User):
-        """Approve the leave and deduct from balance (skip for unpaid)."""
         if self.status != self.STATUS_PENDING:
             raise ValidationError("Only pending requests can be approved.")
 
@@ -454,7 +439,6 @@ class LeaveRequest(models.Model):
         )
 
     def reject(self, reviewed_by: User, reason: str = ''):
-        """Reject a pending leave request."""
         if self.status != self.STATUS_PENDING:
             raise ValidationError("Only pending requests can be rejected.")
 
@@ -476,16 +460,10 @@ class LeaveRequest(models.Model):
         )
 
     def cancel(self, cancelled_by: User):
-        """
-        Cancel a request.
-        - Pending → just cancel
-        - Approved → cancel and restore balance
-        """
         if self.status not in [self.STATUS_PENDING, self.STATUS_APPROVED]:
             raise ValidationError("Only pending or approved requests can be cancelled.")
 
         was_approved = self.status == self.STATUS_APPROVED
-
         self.status = self.STATUS_CANCELLED
         self.save(update_fields=['status', 'updated_at'])
 
@@ -514,21 +492,17 @@ class LeaveRequest(models.Model):
 # ─────────────────────────────────────────────
 
 class LeaveAdjustmentLog(models.Model):
-    """
-    Full audit trail for every leave action.
-    Useful for: HR disputes, monthly reports, compliance.
-    """
 
     ACTION_CHOICES = (
-        ('approved',    'Approved'),
-        ('rejected',    'Rejected'),
-        ('cancelled',   'Cancelled'),
-        ('manual_add',  'Manual Balance Add'),
+        ('approved',      'Approved'),
+        ('rejected',      'Rejected'),
+        ('cancelled',     'Cancelled'),
+        ('manual_add',    'Manual Balance Add'),
         ('manual_deduct', 'Manual Balance Deduct'),
-        ('reset',       'Annual Reset'),
+        ('reset',         'Annual Reset'),
     )
 
-    employee     = models.ForeignKey(
+    employee      = models.ForeignKey(
         Employee,
         on_delete=models.CASCADE,
         related_name='leave_logs'
@@ -545,8 +519,8 @@ class LeaveAdjustmentLog(models.Model):
         on_delete=models.SET_NULL,
         null=True, blank=True
     )
-    note         = models.TextField(blank=True, null=True)
-    timestamp    = models.DateTimeField(auto_now_add=True)
+    note      = models.TextField(blank=True, null=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Leave Adjustment Log'

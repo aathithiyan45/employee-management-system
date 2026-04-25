@@ -11,48 +11,57 @@ const Icon = ({ d, size = 18, stroke = "currentColor" }) => (
   </svg>
 );
 
-// ── Column maps ───────────────────────────────────────────
-const CURRENT_COLS = [
-  "EMP ID", "NAME", "HP NUMBER", "IPA DESIGNATION", "Trade",
-  "IPA SALARY", "PER HR", "IC / WP NO", "FIN NO", "ISSUANCE DATE",
-  "IC TYPE", "S PASS/ WP EXPRIY", "PP.NO", "PP EXPIRY",
-  "NATIONALITY", "D.O.B", "WORK-AT-HEIGHT", "CONFINED SPACE",
-  "WELDER NO", "LSSC S/N", "SIGNALMAN & RIGGER COURSE",
-  "BANK ACCOUNT NUMBER", "ACCOMODATION", "PCP STATUS",
+// ── All columns backend expects (matches views.py import_excel) ───────────
+// IS_ACTIVE: 1 = active, 0 = inactive (if missing → defaults to active)
+const ALL_COLS = [
+  { col: "EMP ID",                   required: true  },
+  { col: "IS_ACTIVE",                required: false, note: "1=Active, 0=Inactive (defaults to 1)" },
+  { col: "COMPANY",                  required: false },
+  { col: "NAME",                     required: false },
+  { col: "HP NUMBER",                required: false },
+  { col: "NATIONALITY",              required: false },
+  { col: "D.O.B",                    required: false },
+  { col: "QUALIFICATION",            required: false },
+  { col: "IPA DESIGNATION",          required: false },
+  { col: "Trade",                    required: false },
+  { col: "IPA SALARY",               required: false },
+  { col: "PER HR",                   required: false },
+  { col: "DOA",                      required: false },
+  { col: "ARRIVAL DATE",             required: false },
+  { col: "DATE JOINED",              required: false },
+  { col: "IC / WP NO",               required: false },
+  { col: "FIN NO",                   required: false },
+  { col: "IC TYPE",                  required: false },
+  { col: "ISSUANCE DATE",            required: false },
+  { col: "S PASS/ WP EXPRIY",        required: false },
+  { col: "PP.NO",                    required: false },
+  { col: "PP EXPIRY",                required: false },
+  { col: "SSIC GT S/N",              required: false },
+  { col: "SSIC GT EXP DATE",         required: false },
+  { col: "SSIC HT S/N",              required: false },
+  { col: "SSIC HT EXP DATE",         required: false },
+  { col: "WORK-AT-HEIGHT",           required: false },
+  { col: "CONFINED SPACE",           required: false },
+  { col: "WELDER NO",                required: false },
+  { col: "LSSC S/N",                 required: false },
+  { col: "SIGNALMAN & RIGGER COURSE",required: false },
+  { col: "BANK ACCOUNT NUMBER",      required: false },
+  { col: "ACCOMODATION",             required: false },
+  { col: "PCP STATUS",               required: false },
+  { col: "REMARKS",                  required: false },
 ];
 
-const CANCELLED_COLS = ["EMP ID", "NAME"];
-
-function parseExcelPreview(file, sheetIndex = 0) {
-  // We'll read via FileReader and parse headers from first row
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        // Basic CSV-like sniff — for Excel we just confirm file exists
-        resolve({ ok: true, name: file.name, size: file.size });
-      } catch {
-        resolve({ ok: false });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  });
-}
-
 // ── Upload Panel ──────────────────────────────────────────
-function UploadPanel({ type, onSuccess }) {
-  const [file, setFile] = useState(null);
-  const [status, setStatus] = useState("idle"); // idle | ready | uploading | success | error
-  const [result, setResult] = useState(null);
+function UploadPanel({ onSuccess }) {
+  const [file, setFile]       = useState(null);
+  const [status, setStatus]   = useState("idle"); // idle | ready | uploading | success | error
+  const [result, setResult]   = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
   const inputRef = useRef();
 
-  const isCurrent = type === "current";
-  const label = isCurrent ? "Current Employees" : "Cancelled Employees";
-  const accent = isCurrent ? "green" : "red";
-
-  const handleFile = async (f) => {
+  const handleFile = (f) => {
     if (!f) return;
     const ext = f.name.split(".").pop().toLowerCase();
     if (!["xlsx", "xls"].includes(ext)) {
@@ -69,16 +78,16 @@ function UploadPanel({ type, onSuccess }) {
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
-    const f = e.dataTransfer.files[0];
-    handleFile(f);
+    handleFile(e.dataTransfer.files[0]);
   };
 
   const handleUpload = async () => {
     if (!file) return;
     setStatus("uploading");
+
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("sheet_type", type); // "current" or "cancelled"
+    // No sheet_type — backend uses IS_ACTIVE column to determine active/inactive
 
     try {
       const res = await api.post("import/", formData, {
@@ -89,7 +98,7 @@ function UploadPanel({ type, onSuccess }) {
       if (onSuccess) onSuccess();
     } catch (err) {
       setErrorMsg(
-        err.response?.data?.error || "Upload failed. Check file and try again."
+        err.response?.data?.error || "Upload failed. Check file format and try again."
       );
       setStatus("error");
     }
@@ -100,42 +109,67 @@ function UploadPanel({ type, onSuccess }) {
     setStatus("idle");
     setResult(null);
     setErrorMsg("");
+    setShowErrors(false);
     if (inputRef.current) inputRef.current.value = "";
   };
 
   return (
-    <div className={`upload-panel ${accent} ${status}`}>
+    <div className={`upload-panel ${status}`}>
       {/* Header */}
       <div className="upload-panel-header">
-        <div className={`panel-badge ${accent}`}>
-          {isCurrent ? (
-            <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" size={20} />
-          ) : (
-            <Icon d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M12 3a9 9 0 1 0 0 18A9 9 0 0 0 12 3z" size={20} />
-          )}
+        <div className="panel-badge">
+          <Icon
+            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
+            size={20}
+          />
         </div>
         <div>
-          <div className="panel-title">{label}</div>
+          <div className="panel-title">Employee Excel Import</div>
           <div className="panel-subtitle">
-            {isCurrent
-              ? "Upload Excel with active employee records"
-              : "Upload Excel with cancelled/terminated records"}
+            Single file upload — IS_ACTIVE column controls active/inactive status
           </div>
         </div>
-        {(status === "ready" || status === "success" || status === "error") && (
+        {status !== "idle" && (
           <button className="panel-reset" onClick={reset} title="Reset">
             <Icon d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" size={15} />
           </button>
         )}
       </div>
 
+      {/* IS_ACTIVE info banner */}
+      <div className="active-info-banner">
+        <Icon d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" size={15} />
+        <span>
+          <strong>IS_ACTIVE column:</strong> Use <code>1</code> or <code>Y</code> for active,{" "}
+          <code>0</code> or <code>N</code> for inactive. If column is missing, all rows default to <strong>Active</strong>.
+        </span>
+      </div>
+
       {/* Expected columns */}
       <div className="expected-cols">
-        <div className="expected-cols-label">Expected columns:</div>
+        <div className="expected-cols-label">
+          Expected columns
+          <span className="col-count">{ALL_COLS.length} total</span>
+        </div>
         <div className="cols-list">
-          {(isCurrent ? CURRENT_COLS : CANCELLED_COLS).map((col) => (
-            <span key={col} className="col-chip">{col}</span>
+          {ALL_COLS.map(({ col, required, note }) => (
+            <span
+              key={col}
+              className={`col-chip ${required ? "required" : ""}`}
+              title={note || (required ? "Required" : "Optional")}
+            >
+              {col}
+              {required && <span className="chip-required-dot" />}
+            </span>
           ))}
+        </div>
+        <div className="col-legend">
+          <span className="col-chip required" style={{ pointerEvents: "none" }}>
+            EMP ID <span className="chip-required-dot" />
+          </span>
+          <span style={{ fontSize: "12px", color: "var(--text-muted, #888)" }}>
+            = Required &nbsp;|&nbsp; All other columns are optional
+          </span>
         </div>
       </div>
 
@@ -163,7 +197,7 @@ function UploadPanel({ type, onSuccess }) {
         </div>
       )}
 
-      {/* File ready state */}
+      {/* File ready / uploading state */}
       {(status === "ready" || status === "uploading") && (
         <div className="file-ready">
           <div className="file-info">
@@ -176,13 +210,13 @@ function UploadPanel({ type, onSuccess }) {
                 {file ? (file.size / 1024).toFixed(1) + " KB" : ""}
               </div>
             </div>
-            <div className={`file-check ${accent}`}>
+            <div className="file-check">
               <Icon d="M20 6 9 17l-5-5" size={14} stroke="white" />
             </div>
           </div>
 
           <button
-            className={`upload-btn ${accent} ${status === "uploading" ? "loading" : ""}`}
+            className={`upload-btn ${status === "uploading" ? "loading" : ""}`}
             onClick={handleUpload}
             disabled={status === "uploading"}
           >
@@ -208,25 +242,54 @@ function UploadPanel({ type, onSuccess }) {
             <Icon d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3" size={22} stroke="#16a34a" />
             <span>Import Successful!</span>
           </div>
+
           <div className="result-stats">
-            {isCurrent ? (
-              <>
-                <div className="stat-pill created">
-                  <span className="stat-num">{result.created}</span>
-                  <span className="stat-label">Created</span>
-                </div>
-                <div className="stat-pill updated">
-                  <span className="stat-num">{result.updated}</span>
-                  <span className="stat-label">Updated</span>
-                </div>
-              </>
-            ) : (
-              <div className="stat-pill inactivated">
-                <span className="stat-num">{result.inactivated ?? result.updated ?? 0}</span>
-                <span className="stat-label">Inactivated</span>
-              </div>
-            )}
+            <div className="stat-pill created">
+              <span className="stat-num">{result.created ?? 0}</span>
+              <span className="stat-label">Created</span>
+            </div>
+            <div className="stat-pill updated">
+              <span className="stat-num">{result.updated ?? 0}</span>
+              <span className="stat-label">Updated</span>
+            </div>
+            <div className="stat-pill skipped">
+              <span className="stat-num">{result.skipped ?? 0}</span>
+              <span className="stat-label">Skipped</span>
+            </div>
+            <div className="stat-pill total">
+              <span className="stat-num">{result.total_rows ?? 0}</span>
+              <span className="stat-label">Total Rows</span>
+            </div>
           </div>
+
+          {/* Row-level errors from backend */}
+          {result.errors && result.errors.length > 0 && (
+            <div className="row-errors">
+              <button
+                className="row-errors-toggle"
+                onClick={() => setShowErrors(v => !v)}
+              >
+                <Icon
+                  d={showErrors
+                    ? "M18 15l-6-6-6 6"
+                    : "M6 9l6 6 6-6"}
+                  size={14}
+                />
+                {result.errors.length} row error{result.errors.length > 1 ? "s" : ""} detected
+              </button>
+              {showErrors && (
+                <div className="row-errors-list">
+                  {result.errors.map((e, i) => (
+                    <div key={i} className="row-error-item">
+                      <span className="row-error-loc">Row {e.row} · {e.emp_id || "—"}</span>
+                      <span className="row-error-msg">{e.error}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <button className="upload-again-btn" onClick={reset}>
             Upload Another File
           </button>
@@ -263,7 +326,7 @@ function ImportEmployees() {
 
   return (
     <div className="dashboard-shell">
-      {/* ══ SIDEBAR (same as Dashboard) ══ */}
+      {/* ══ SIDEBAR ══ */}
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="sidebar-brand-icon">
@@ -345,36 +408,59 @@ function ImportEmployees() {
 
         <div className="dashboard-content">
           <div className="import-page-header">
-            <h2>Upload Employee Excel Files</h2>
+            <h2>Upload Employee Excel File</h2>
             <p>
-              Upload separate Excel files for <strong>Current</strong> and <strong>Cancelled</strong> employees.
-              Data will be previewed before storing to the database.
+              Upload a single Excel file containing all employees. Use the{" "}
+              <strong>IS_ACTIVE</strong> column to mark active (<code>1</code>) or
+              inactive (<code>0</code>) employees. Existing records are{" "}
+              <strong>updated</strong> by EMP ID — never duplicated.
             </p>
           </div>
 
-          <div className="import-grid">
-            <UploadPanel
-              type="current"
-              onSuccess={() => setRefreshKey(k => k + 1)}
-            />
-            <UploadPanel
-              type="cancelled"
-              onSuccess={() => setRefreshKey(k => k + 1)}
-            />
+          {/* Single panel — no more two-panel split */}
+          <div className="import-single">
+            <UploadPanel onSuccess={() => setRefreshKey(k => k + 1)} />
           </div>
 
-          {/* Info note */}
-          <div className="import-note">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <span>
-              Existing employees will be <strong>updated</strong> (not duplicated) based on EMP ID.
-              Current employees are marked <strong>active</strong>, cancelled employees are marked <strong>inactive</strong>.
-            </span>
+          {/* Info notes */}
+          <div className="import-notes">
+            <div className="import-note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span>
+                <strong>EMP ID</strong> is the only required column. All other columns
+                are optional and will be skipped if missing.
+              </span>
+            </div>
+            <div className="import-note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span>
+                <strong>COMPANY</strong> column maps to Division. Valid values: PDS ENG,
+                GSI ENG, PDS MARINE, PDS OFFSHORE, GSI MARINE. Unknown values are
+                created automatically.
+              </span>
+            </div>
+            <div className="import-note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span>
+                <strong>DATE JOINED</strong> drives the auto-calculated{" "}
+                <strong>Experience Years</strong> field — no manual entry needed.
+              </span>
+            </div>
           </div>
         </div>
       </div>
