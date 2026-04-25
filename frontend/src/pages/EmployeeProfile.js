@@ -6,35 +6,26 @@ import "./EmployeeProfile.css";
 function EmployeeProfile() {
   const { empId } = useParams();
   const navigate = useNavigate();
-  const [employee, setEmployee] = useState(null);
+  const [emp, setEmp] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [editing, setEditing] = useState({});
   const [formData, setFormData] = useState({});
   const [adminEditMode, setAdminEditMode] = useState(false);
+
+  const val = (v) => (v !== null && v !== undefined && v !== "" ? v : "—");
 
   // ── Fetch Employee Data ──────────────────────────────────
   const fetchEmployee = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get(`employee/${empId}/`);
-      setEmployee(response.data);
-      setFormData({
-        name: response.data.name || "",
-        phone: response.data.phone || "",
-        salary: response.data.ipa_salary || "",
-        designation_ipa: response.data.designation_ipa || "",
-        nationality: response.data.nationality || "",
-        dob: response.data.dob || "",
-        work_permit_no: response.data.work_permit_no || "",
-        fin_no: response.data.fin_no || "",
-        passport_no: response.data.passport_no || "",
-        qualification: response.data.qualification || "",
-        accommodation: response.data.accommodation || "",
-        remarks: response.data.remarks || "",
-      });
-    } catch (error) {
-      console.error("Error fetching employee:", error);
-      alert("Failed to load employee data");
+      const response = await api.get(`employees/${empId}/`);
+      setEmp(response.data);
+      setFormData(response.data);
+      setError(null);
+    } catch (err) {
+      console.error("Error fetching employee:", err);
+      setError("Employee not found");
     } finally {
       setLoading(false);
     }
@@ -51,350 +42,549 @@ function EmployeeProfile() {
 
   const cancelEditing = (field) => {
     setEditing({ ...editing, [field]: false });
-    // Reset form data for this field
-    if (employee) {
-      setFormData({
-        ...formData,
-        [field]: employee[field] || "",
-      });
-    }
+    setFormData({ ...formData, [field]: emp[field] || "" });
   };
 
   const saveField = async (field) => {
     try {
       const updateData = { [field]: formData[field] };
-      await api.put(`employee/update/${empId}/`, updateData, {
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      // Update local state
-      setEmployee({ ...employee, [field]: formData[field] });
+      await api.put(`employees/${empId}/update/`, updateData);
+      setEmp({ ...emp, [field]: formData[field] });
       setEditing({ ...editing, [field]: false });
-
-      alert(
-        `${field.charAt(0).toUpperCase() + field.slice(1)} updated successfully!`,
-      );
     } catch (error) {
       console.error("Error updating field:", error);
       alert(`Failed to update ${field}`);
     }
   };
 
-  const handleInputChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
-  };
-
-  if (loading) {
+  if (loading)
     return (
-      <div className="employee-profile-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading employee profile...</p>
+      <div className="detail-loading">
+        <div className="detail-spinner" />
+        <p>Loading employee…</p>
       </div>
     );
-  }
 
-  if (!employee) {
+  if (error)
     return (
-      <div className="employee-profile-error">
-        <h2>Employee Not Found</h2>
-        <p>The requested employee could not be found.</p>
-        <button onClick={() => navigate("/employees")} className="back-btn">
-          ← Back to Employee List
+      <div className="detail-loading">
+        <p className="detail-error">{error}</p>
+        <button className="back-btn" onClick={() => navigate(-1)}>
+          ← Back
         </button>
       </div>
     );
-  }
 
-  const initials = (employee.name || "E")
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  const isActive = emp.status?.toLowerCase() === "active";
 
   return (
-    <div className="employee-profile-page">
-      {/* ── Header ────────────────────────────────────────── */}
-      <div className="profile-header">
-        <button onClick={() => navigate("/employees")} className="back-btn">
-          ← Back to Employee List
-        </button>
-        <div className="header-right">
-          <h1>Employee Profile</h1>
-          <div className="admin-edit-toggle">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={adminEditMode}
-                onChange={(e) => {
-                  console.log("Toggle changed:", e.target.checked);
-                  setAdminEditMode(e.target.checked);
-                }}
-                className="toggle-input"
-              />
-              <span className="toggle-slider"></span>
-              <span className="toggle-text">Admin Edit Mode</span>
-            </label>
+    <div className="detail-page">
+      {/* ── TOP BAR ───────────────────────────────────── */}
+      <div className="detail-topbar">
+        <div className="topbar-left">
+          <button className="back-btn" onClick={() => navigate(-1)}>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Back to List
+          </button>
+        </div>
+        <div className="topbar-right">
+          <label className="admin-toggle">
+            <input
+              type="checkbox"
+              checked={adminEditMode}
+              onChange={(e) => setAdminEditMode(e.target.checked)}
+            />
+            <span className="toggle-slider-sm"></span>
+            <span className="toggle-text-sm">Edit Mode</span>
+          </label>
+        </div>
+      </div>
+
+      {/* ── HERO CARD ─────────────────────────────────── */}
+      <div className="detail-hero">
+        <div className="detail-avatar">{emp.name?.charAt(0).toUpperCase()}</div>
+        <div className="detail-hero-info">
+          <h1>{emp.name}</h1>
+          <p className="detail-hero-sub">
+            {emp.designation_ipa || emp.designation_aug || "Employee"}
+            <span className="hero-dot">·</span>
+            {emp.division}
+          </p>
+          <div className="detail-hero-badges">
+            <span className="emp-id-badge">{emp.emp_id}</span>
+            <span className={`status-pill ${isActive ? "active" : "inactive"}`}>
+              {emp.status}
+            </span>
+            {emp.nationality && (
+              <span className="nationality-badge">{emp.nationality}</span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* ── Profile Card ──────────────────────────────────── */}
-      <div className="profile-card">
-        {/* Avatar Section */}
-        <div className="profile-avatar-section">
-          <div className="profile-avatar-large">{initials}</div>
-          <div className="profile-basic-info">
-            <h2>{employee.name}</h2>
-            <p className="emp-id">EMP ID: {employee.emp_id}</p>
-            <p className="division">{employee.division}</p>
-            <span className={`status-badge ${employee.status?.toLowerCase()}`}>
-              {employee.status}
-            </span>
-          </div>
-        </div>
+      {/* ── SECTIONS GRID ─────────────────────────────── */}
+      <div className="detail-sections">
+        {/* Basic Info */}
+        <Section title="Basic Info" icon="👤">
+          <EditField
+            label="EMP ID"
+            value={<span className="mono-val">{emp.emp_id}</span>}
+            editable={false}
+          />
+          <EditField
+            label="Phone"
+            field="phone"
+            value={val(formData.phone)}
+            isEditing={editing.phone}
+            onEdit={() => startEditing("phone")}
+            onChange={(v) => setFormData({ ...formData, phone: v })}
+            onSave={() => saveField("phone")}
+            onCancel={() => cancelEditing("phone")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="Nationality"
+            field="nationality"
+            value={val(formData.nationality)}
+            isEditing={editing.nationality}
+            onEdit={() => startEditing("nationality")}
+            onChange={(v) => setFormData({ ...formData, nationality: v })}
+            onSave={() => saveField("nationality")}
+            onCancel={() => cancelEditing("nationality")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="Date of Birth"
+            field="dob"
+            value={val(formData.dob)}
+            isEditing={editing.dob}
+            onEdit={() => startEditing("dob")}
+            onChange={(v) => setFormData({ ...formData, dob: v })}
+            onSave={() => saveField("dob")}
+            onCancel={() => cancelEditing("dob")}
+            adminEditMode={adminEditMode}
+            type="date"
+          />
+          <EditField
+            label="Division"
+            value={val(emp.division)}
+            editable={false}
+          />
+          <EditField
+            label="Status"
+            value={
+              <span
+                className={`status-pill ${isActive ? "active" : "inactive"}`}
+              >
+                {emp.status}
+              </span>
+            }
+            editable={false}
+          />
+        </Section>
 
-        {/* Details Sections */}
-        <div className="profile-details">
-          {/* Basic Information */}
-          <div className="detail-section">
-            <h3>Basic Information</h3>
-            <div className="fields-grid">
-              <EditableField
-                label="Name"
-                field="name"
-                value={formData.name}
-                isEditing={editing.name}
-                onStartEdit={() => startEditing("name")}
-                onCancel={() => cancelEditing("name")}
-                onSave={() => saveField("name")}
-                onChange={(value) => handleInputChange("name", value)}
-                adminEditMode={adminEditMode}
-              />
+        {/* Designation & Salary */}
+        <Section title="Designation & Salary" icon="💼">
+          <EditField
+            label="IPA Designation"
+            field="designation_ipa"
+            value={val(formData.designation_ipa)}
+            isEditing={editing.designation_ipa}
+            onEdit={() => startEditing("designation_ipa")}
+            onChange={(v) => setFormData({ ...formData, designation_ipa: v })}
+            onSave={() => saveField("designation_ipa")}
+            onCancel={() => cancelEditing("designation_ipa")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="Aug Designation"
+            field="designation_aug"
+            value={val(formData.designation_aug)}
+            isEditing={editing.designation_aug}
+            onEdit={() => startEditing("designation_aug")}
+            onChange={(v) => setFormData({ ...formData, designation_aug: v })}
+            onSave={() => saveField("designation_aug")}
+            onCancel={() => cancelEditing("designation_aug")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="IPA Salary"
+            field="ipa_salary"
+            value={val(formData.ipa_salary)}
+            isEditing={editing.ipa_salary}
+            onEdit={() => startEditing("ipa_salary")}
+            onChange={(v) => setFormData({ ...formData, ipa_salary: v })}
+            onSave={() => saveField("ipa_salary")}
+            onCancel={() => cancelEditing("ipa_salary")}
+            adminEditMode={adminEditMode}
+            type="number"
+          />
+          <EditField
+            label="Per Hour"
+            field="per_hr"
+            value={val(formData.per_hr)}
+            isEditing={editing.per_hr}
+            onEdit={() => startEditing("per_hr")}
+            onChange={(v) => setFormData({ ...formData, per_hr: v })}
+            onSave={() => saveField("per_hr")}
+            onCancel={() => cancelEditing("per_hr")}
+            adminEditMode={adminEditMode}
+            type="number"
+          />
+          <EditField
+            label="Bank Account"
+            field="bank_account"
+            value={val(formData.bank_account)}
+            isEditing={editing.bank_account}
+            onEdit={() => startEditing("bank_account")}
+            onChange={(v) => setFormData({ ...formData, bank_account: v })}
+            onSave={() => saveField("bank_account")}
+            onCancel={() => cancelEditing("bank_account")}
+            adminEditMode={adminEditMode}
+          />
+        </Section>
 
-              <EditableField
-                label="Phone"
-                field="phone"
-                value={formData.phone}
-                isEditing={editing.phone}
-                onStartEdit={() => startEditing("phone")}
-                onCancel={() => cancelEditing("phone")}
-                onSave={() => saveField("phone")}
-                onChange={(value) => handleInputChange("phone", value)}
-                adminEditMode={adminEditMode}
-              />
+        {/* Work Permit */}
+        <Section title="Work Permit" icon="📋">
+          <EditField
+            label="Work Permit No"
+            field="work_permit_no"
+            value={val(formData.work_permit_no)}
+            isEditing={editing.work_permit_no}
+            onEdit={() => startEditing("work_permit_no")}
+            onChange={(v) => setFormData({ ...formData, work_permit_no: v })}
+            onSave={() => saveField("work_permit_no")}
+            onCancel={() => cancelEditing("work_permit_no")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="FIN No"
+            field="fin_no"
+            value={val(formData.fin_no)}
+            isEditing={editing.fin_no}
+            onEdit={() => startEditing("fin_no")}
+            onChange={(v) => setFormData({ ...formData, fin_no: v })}
+            onSave={() => saveField("fin_no")}
+            onCancel={() => cancelEditing("fin_no")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="Issue Date"
+            field="issue_date"
+            value={val(formData.issue_date)}
+            isEditing={editing.issue_date}
+            onEdit={() => startEditing("issue_date")}
+            onChange={(v) => setFormData({ ...formData, issue_date: v })}
+            onSave={() => saveField("issue_date")}
+            onCancel={() => cancelEditing("issue_date")}
+            adminEditMode={adminEditMode}
+            type="date"
+          />
+          <EditField
+            label="WP Expiry"
+            field="wp_expiry"
+            value={<ExpiryVal date={formData.wp_expiry} />}
+            isEditing={editing.wp_expiry}
+            onEdit={() => startEditing("wp_expiry")}
+            onChange={(v) => setFormData({ ...formData, wp_expiry: v })}
+            onSave={() => saveField("wp_expiry")}
+            onCancel={() => cancelEditing("wp_expiry")}
+            adminEditMode={adminEditMode}
+            type="date"
+          />
+          <EditField
+            label="IC Status"
+            field="ic_status"
+            value={val(formData.ic_status)}
+            isEditing={editing.ic_status}
+            onEdit={() => startEditing("ic_status")}
+            onChange={(v) => setFormData({ ...formData, ic_status: v })}
+            onSave={() => saveField("ic_status")}
+            onCancel={() => cancelEditing("ic_status")}
+            adminEditMode={adminEditMode}
+          />
+        </Section>
 
-              <EditableField
-                label="Salary"
-                field="salary"
-                value={formData.salary}
-                isEditing={editing.salary}
-                onStartEdit={() => startEditing("salary")}
-                onCancel={() => cancelEditing("salary")}
-                onSave={() => saveField("salary")}
-                onChange={(value) => handleInputChange("salary", value)}
-                type="number"
-                adminEditMode={adminEditMode}
-              />
+        {/* Passport */}
+        <Section title="Passport" icon="🛂">
+          <EditField
+            label="Passport No"
+            field="passport_no"
+            value={val(formData.passport_no)}
+            isEditing={editing.passport_no}
+            onEdit={() => startEditing("passport_no")}
+            onChange={(v) => setFormData({ ...formData, passport_no: v })}
+            onSave={() => saveField("passport_no")}
+            onCancel={() => cancelEditing("passport_no")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="Expiry"
+            field="passport_expiry"
+            value={<ExpiryVal date={formData.passport_expiry} />}
+            isEditing={editing.passport_expiry}
+            onEdit={() => startEditing("passport_expiry")}
+            onChange={(v) => setFormData({ ...formData, passport_expiry: v })}
+            onSave={() => saveField("passport_expiry")}
+            onCancel={() => cancelEditing("passport_expiry")}
+            adminEditMode={adminEditMode}
+            type="date"
+          />
+          <EditField
+            label="Issue Date"
+            field="passport_issue_date"
+            value={val(formData.passport_issue_date)}
+            isEditing={editing.passport_issue_date}
+            onEdit={() => startEditing("passport_issue_date")}
+            onChange={(v) =>
+              setFormData({ ...formData, passport_issue_date: v })
+            }
+            onSave={() => saveField("passport_issue_date")}
+            onCancel={() => cancelEditing("passport_issue_date")}
+            adminEditMode={adminEditMode}
+            type="date"
+          />
+          <EditField
+            label="Issue Place"
+            field="passport_issue_place"
+            value={val(formData.passport_issue_place)}
+            isEditing={editing.passport_issue_place}
+            onEdit={() => startEditing("passport_issue_place")}
+            onChange={(v) =>
+              setFormData({ ...formData, passport_issue_place: v })
+            }
+            onSave={() => saveField("passport_issue_place")}
+            onCancel={() => cancelEditing("passport_issue_place")}
+            adminEditMode={adminEditMode}
+          />
+        </Section>
 
-              <EditableField
-                label="Designation"
-                field="designation_ipa"
-                value={formData.designation_ipa}
-                isEditing={editing.designation_ipa}
-                onStartEdit={() => startEditing("designation_ipa")}
-                onCancel={() => cancelEditing("designation_ipa")}
-                onSave={() => saveField("designation_ipa")}
-                onChange={(value) =>
-                  handleInputChange("designation_ipa", value)
-                }
-                adminEditMode={adminEditMode}
-              />
+        {/* Joining */}
+        <Section title="Joining Details" icon="📅">
+          <EditField
+            label="Date of Joining"
+            field="doa"
+            value={val(formData.doa)}
+            isEditing={editing.doa}
+            onEdit={() => startEditing("doa")}
+            onChange={(v) => setFormData({ ...formData, doa: v })}
+            onSave={() => saveField("doa")}
+            onCancel={() => cancelEditing("doa")}
+            adminEditMode={adminEditMode}
+            type="date"
+          />
+          <EditField
+            label="Arrival Date"
+            field="arrival_date"
+            value={val(formData.arrival_date)}
+            isEditing={editing.arrival_date}
+            onEdit={() => startEditing("arrival_date")}
+            onChange={(v) => setFormData({ ...formData, arrival_date: v })}
+            onSave={() => saveField("arrival_date")}
+            onCancel={() => cancelEditing("arrival_date")}
+            adminEditMode={adminEditMode}
+            type="date"
+          />
+          <EditField
+            label="Accommodation"
+            field="accommodation"
+            value={val(formData.accommodation)}
+            isEditing={editing.accommodation}
+            onEdit={() => startEditing("accommodation")}
+            onChange={(v) => setFormData({ ...formData, accommodation: v })}
+            onSave={() => saveField("accommodation")}
+            onCancel={() => cancelEditing("accommodation")}
+            adminEditMode={adminEditMode}
+          />
+          <EditField
+            label="PCP Status"
+            field="pcp_status"
+            value={val(formData.pcp_status)}
+            isEditing={editing.pcp_status}
+            onEdit={() => startEditing("pcp_status")}
+            onChange={(v) => setFormData({ ...formData, pcp_status: v })}
+            onSave={() => saveField("pcp_status")}
+            onCancel={() => cancelEditing("pcp_status")}
+            adminEditMode={adminEditMode}
+          />
+        </Section>
 
-              <EditableField
-                label="Nationality"
-                field="nationality"
-                value={formData.nationality}
-                isEditing={editing.nationality}
-                onStartEdit={() => startEditing("nationality")}
-                onCancel={() => cancelEditing("nationality")}
-                onSave={() => saveField("nationality")}
-                onChange={(value) => handleInputChange("nationality", value)}
-                adminEditMode={adminEditMode}
-              />
+        {/* Qualification */}
+        <Section title="Qualification" icon="🎓">
+          <EditField
+            label="Qualification"
+            field="qualification"
+            value={val(formData.qualification)}
+            isEditing={editing.qualification}
+            onEdit={() => startEditing("qualification")}
+            onChange={(v) => setFormData({ ...formData, qualification: v })}
+            onSave={() => saveField("qualification")}
+            onCancel={() => cancelEditing("qualification")}
+            adminEditMode={adminEditMode}
+          />
+        </Section>
 
-              <EditableField
-                label="Date of Birth"
-                field="dob"
-                value={formData.dob}
-                isEditing={editing.dob}
-                onStartEdit={() => startEditing("dob")}
-                onCancel={() => cancelEditing("dob")}
-                onSave={() => saveField("dob")}
-                onChange={(value) => handleInputChange("dob", value)}
-                type="date"
-                adminEditMode={adminEditMode}
-              />
+        {/* Remarks */}
+        {formData.remarks && (
+          <Section title="Remarks" icon="📝" wide>
+            <div className="remarks-section">
+              {editing.remarks ? (
+                <div className="edit-textarea">
+                  <textarea
+                    value={formData.remarks}
+                    onChange={(e) =>
+                      setFormData({ ...formData, remarks: e.target.value })
+                    }
+                    className="detail-textarea"
+                  />
+                  <div className="edit-actions">
+                    <button
+                      className="save-btn"
+                      onClick={() => saveField("remarks")}
+                    >
+                      Save
+                    </button>
+                    <button
+                      className="cancel-btn"
+                      onClick={() => cancelEditing("remarks")}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="remarks-view">
+                  <p className="remarks-text">{formData.remarks}</p>
+                  {adminEditMode && (
+                    <button
+                      className="edit-btn-inline"
+                      onClick={() => startEditing("remarks")}
+                    >
+                      ✏️ Edit
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Work Permit & Documents */}
-          <div className="detail-section">
-            <h3>Work Permit & Documents</h3>
-            <div className="fields-grid">
-              <EditableField
-                label="Work Permit No"
-                field="work_permit_no"
-                value={formData.work_permit_no}
-                isEditing={editing.work_permit_no}
-                onStartEdit={() => startEditing("work_permit_no")}
-                onCancel={() => cancelEditing("work_permit_no")}
-                onSave={() => saveField("work_permit_no")}
-                onChange={(value) => handleInputChange("work_permit_no", value)}
-                adminEditMode={adminEditMode}
-              />
-
-              <EditableField
-                label="FIN No"
-                field="fin_no"
-                value={formData.fin_no}
-                isEditing={editing.fin_no}
-                onStartEdit={() => startEditing("fin_no")}
-                onCancel={() => cancelEditing("fin_no")}
-                onSave={() => saveField("fin_no")}
-                onChange={(value) => handleInputChange("fin_no", value)}
-                adminEditMode={adminEditMode}
-              />
-
-              <EditableField
-                label="Passport No"
-                field="passport_no"
-                value={formData.passport_no}
-                isEditing={editing.passport_no}
-                onStartEdit={() => startEditing("passport_no")}
-                onCancel={() => cancelEditing("passport_no")}
-                onSave={() => saveField("passport_no")}
-                onChange={(value) => handleInputChange("passport_no", value)}
-                adminEditMode={adminEditMode}
-              />
-            </div>
-          </div>
-
-          {/* Additional Information */}
-          <div className="detail-section">
-            <h3>Additional Information</h3>
-            <div className="fields-grid">
-              <EditableField
-                label="Qualification"
-                field="qualification"
-                value={formData.qualification}
-                isEditing={editing.qualification}
-                onStartEdit={() => startEditing("qualification")}
-                onCancel={() => cancelEditing("qualification")}
-                onSave={() => saveField("qualification")}
-                onChange={(value) => handleInputChange("qualification", value)}
-                adminEditMode={adminEditMode}
-              />
-
-              <EditableField
-                label="Accommodation"
-                field="accommodation"
-                value={formData.accommodation}
-                isEditing={editing.accommodation}
-                onStartEdit={() => startEditing("accommodation")}
-                onCancel={() => cancelEditing("accommodation")}
-                onSave={() => saveField("accommodation")}
-                onChange={(value) => handleInputChange("accommodation", value)}
-                adminEditMode={adminEditMode}
-              />
-
-              <EditableField
-                label="Remarks"
-                field="remarks"
-                value={formData.remarks}
-                isEditing={editing.remarks}
-                onStartEdit={() => startEditing("remarks")}
-                onCancel={() => cancelEditing("remarks")}
-                onSave={() => saveField("remarks")}
-                onChange={(value) => handleInputChange("remarks", value)}
-                isTextarea={true}
-                adminEditMode={adminEditMode}
-              />
-            </div>
-          </div>
-        </div>
+          </Section>
+        )}
       </div>
     </div>
   );
 }
 
-// ── Editable Field Component ─────────────────────────────
-function EditableField({
-  label,
-  field,
-  value,
-  isEditing,
-  onStartEdit,
-  onCancel,
-  onSave,
-  onChange,
-  type = "text",
-  isTextarea = false,
-  adminEditMode = false,
-}) {
+/* ── Helper Components ───────────────────────────────── */
+
+function Section({ title, icon, children, wide }) {
   return (
-    <div className="editable-field">
-      <label className="field-label">{label}</label>
-      <div className="field-content">
-        {isEditing ? (
-          <div className="edit-mode">
-            {isTextarea ? (
-              <textarea
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="field-input textarea"
-                rows="3"
-              />
-            ) : (
-              <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className="field-input"
-              />
-            )}
-            <div className="edit-actions">
-              <button onClick={onSave} className="save-btn">
-                Save
-              </button>
-              <button onClick={onCancel} className="cancel-btn">
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div
-            className={`view-mode ${adminEditMode ? "editable" : ""}`}
-            onClick={() => adminEditMode && onStartEdit()}
-          >
-            <span className="field-value">{value || "—"}</span>
-            {adminEditMode && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onStartEdit();
-                }}
-                className="edit-btn-small"
-              >
-                ✏️ Edit
-              </button>
-            )}
-          </div>
-        )}
+    <div className={`detail-section ${wide ? "detail-section--wide" : ""}`}>
+      <div className="section-title">
+        <span className="section-icon">{icon}</span>
+        {title}
       </div>
+      <div className="section-grid">{children}</div>
     </div>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  field,
+  isEditing,
+  onEdit,
+  onChange,
+  onSave,
+  onCancel,
+  adminEditMode,
+  type = "text",
+  editable = true,
+}) {
+  if (!editable) {
+    return (
+      <div className="detail-field">
+        <div className="detail-field-label">{label}</div>
+        <div className="detail-field-value">{value}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="detail-field">
+      <div className="detail-field-label">{label}</div>
+      {isEditing ? (
+        <div className="field-edit-mode">
+          <input
+            type={type}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="detail-input"
+            autoFocus
+          />
+          <div className="edit-actions-inline">
+            <button className="save-btn-sm" onClick={onSave} title="Save">
+              ✓
+            </button>
+            <button className="cancel-btn-sm" onClick={onCancel} title="Cancel">
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`detail-field-value ${
+            adminEditMode && field ? "editable-field" : ""
+          }`}
+          onClick={() => adminEditMode && field && onEdit && onEdit()}
+        >
+          {value}
+          {adminEditMode && field && (
+            <button
+              className="edit-btn-small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              title="Edit"
+            >
+              ✏️
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExpiryVal({ date }) {
+  if (!date || date === "" || date === null)
+    return <span className="empty-val">—</span>;
+
+  const today = new Date();
+  const expDate = new Date(date);
+  const diffMs = expDate - today;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  let cls = "";
+  if (diffDays < 0) cls = "expiry-expired";
+  else if (diffDays <= 30) cls = "expiry-soon";
+  else cls = "expiry-ok";
+
+  return (
+    <span className={`expiry-val ${cls}`}>
+      {date}
+      {diffDays < 0 && <span className="expiry-tag">Expired</span>}
+      {diffDays >= 0 && diffDays <= 30 && (
+        <span className="expiry-tag">Soon</span>
+      )}
+    </span>
   );
 }
 

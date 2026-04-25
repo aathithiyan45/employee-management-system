@@ -13,7 +13,7 @@ function EmployeeDetail() {
   useEffect(() => {
     setLoading(true);
     api
-      .get(`employee/${empId}/`)
+      .get(`employees/${empId}/`)
       .then((res) => {
         setEmp(res.data);
         setLoading(false);

@@ -7,7 +7,7 @@ function SearchEmployee() {
 
   const searchEmployee = async () => {
     try {
-      const res = await api.get(`employee/${empId}/`);
+      const res = await api.get(`employees/${empId}/`);
       setEmployee(res.data);
     } catch (err) {
       alert("Employee not found");

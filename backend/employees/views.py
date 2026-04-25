@@ -488,6 +488,8 @@ def employee_list(request):
         today   = date.today()
         next_60 = today + timedelta(days=60)
         next_90 = today + timedelta(days=90)
+        # Only show expiry alerts for active employees (matching dashboard behavior)
+        employees = employees.filter(is_active=True)
         if expiry_alert == "wp":
             employees = employees.filter(wp_expiry__range=(today, next_60))
         elif expiry_alert == "passport":
