@@ -9,6 +9,7 @@ import ImportEmployees from "./pages/Importemployees";
 import LeaveManagement from "./pages/LeaveManagement";
 import LeaveBalance from "./pages/LeaveBalance";
 import PrivateRoute from "./components/Privateroute";
+import ChangePassword from "./pages/ChangePassword";
 import "./App.css";
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/change-password" element={<ChangePassword />} />
       </Routes>
     </BrowserRouter>
   );

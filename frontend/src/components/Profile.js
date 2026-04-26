@@ -10,7 +10,7 @@ function Profile() {
     const user = JSON.parse(localStorage.getItem("user"));
     if (!user || !user.emp_id) return;
     api
-      .get(`employee/${user.emp_id}/`)
+      .get(`employees/${user.emp_id}/`)
       .then((res) => setData(res.data))
       .catch((err) => console.log(err));
   }, []);

@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom";
 import "./Login.css";
 
 function Login() {
-  const [role, setRole] = useState("admin");
+  const [role, setRole]       = useState("admin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]  = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
@@ -34,9 +34,18 @@ function Login() {
 
       // Backend returns: { status, username, role, must_change_password, emp_id, access, refresh }
       localStorage.setItem("user", JSON.stringify(data));
+      localStorage.setItem("access", data.access);
+      localStorage.setItem("refresh", data.refresh);
+
+      // 🔐 Force password change on first login
+      if (data.must_change_password) {
+        navigate("/change-password");
+        return;
+      }
 
       if (data.role === "admin") navigate("/dashboard");
       else navigate("/profile");
+
     } catch {
       alert("Invalid credentials");
     } finally {
@@ -47,9 +56,12 @@ function Login() {
   return (
     <div className="login-page">
       <div className="login-card">
+
+        {/* Brand */}
         <div className="login-brand">
           <div className="login-brand-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
               <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -68,11 +80,23 @@ function Login() {
           Sign in to access your {role === "admin" ? "management dashboard" : "employee profile"}
         </p>
 
+        {/* Role toggle */}
         <div className="role-toggle">
-          <button className={role === "admin" ? "active" : ""} onClick={() => setRole("admin")}>Admin</button>
-          <button className={role === "employee" ? "active" : ""} onClick={() => setRole("employee")}>Employee</button>
+          <button
+            className={role === "admin" ? "active" : ""}
+            onClick={() => setRole("admin")}
+          >
+            Admin
+          </button>
+          <button
+            className={role === "employee" ? "active" : ""}
+            onClick={() => setRole("employee")}
+          >
+            Employee
+          </button>
         </div>
 
+        {/* Username / EMP ID */}
         <div className="login-field">
           <label>{role === "admin" ? "Username" : "Employee ID"}</label>
           <input
@@ -84,6 +108,7 @@ function Login() {
           />
         </div>
 
+        {/* Password */}
         <div className="login-field">
           <label>Password</label>
           <input
@@ -98,6 +123,7 @@ function Login() {
         <button className="login-btn" onClick={handleLogin} disabled={loading}>
           {loading ? "Signing in..." : "Sign In"}
         </button>
+
       </div>
     </div>
   );

@@ -21,6 +21,12 @@ from .models import (
     LeaveBalance, LeaveRequest, LeaveAdjustmentLog,
 )
 
+import secrets
+import string
+import io
+import openpyxl
+from django.http import HttpResponse
+
 
 # ─────────────────────────────────────────────
 # HELPERS
@@ -72,6 +78,17 @@ def safe_bool(val):
         return False
 
 
+def generate_password(length=10):
+    """Generate a secure random password with letters, digits, and symbols."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%"
+    while True:
+        pwd = ''.join(secrets.choice(alphabet) for _ in range(length))
+        if (any(c.isupper() for c in pwd)
+                and any(c.isdigit() for c in pwd)
+                and any(c in "!@#$%" for c in pwd)):
+            return pwd
+
+
 # ─────────────────────────────────────────────
 # AUTH
 # ─────────────────────────────────────────────
@@ -111,6 +128,31 @@ def login_view(request):
         })
 
     return Response({"status": "error", "message": "Invalid credentials"}, status=401)
+
+
+# ─────────────────────────────────────────────
+# CHANGE PASSWORD
+# ─────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    user = request.user
+    new_password = request.data.get("new_password")
+    confirm      = request.data.get("confirm_password")
+
+    if not new_password or not confirm:
+        return Response({"error": "Both fields required"}, status=400)
+    if new_password != confirm:
+        return Response({"error": "Passwords do not match"}, status=400)
+    if len(new_password) < 8:
+        return Response({"error": "Password must be at least 8 characters"}, status=400)
+
+    user.set_password(new_password)
+    user.must_change_password = False
+    user.save()
+
+    return Response({"message": "Password changed successfully"})
 
 
 # ─────────────────────────────────────────────
@@ -287,7 +329,7 @@ def chart_designation_breakdown(request):
 
 
 # ─────────────────────────────────────────────
-# EXCEL IMPORT  ← FULL UPDATED VERSION
+# EXCEL IMPORT — with auto user creation
 # ─────────────────────────────────────────────
 
 @api_view(['POST'])
@@ -298,6 +340,10 @@ def import_excel(request):
     IS_ACTIVE column: 1 = active (current), 0 = inactive (cancelled).
     If IS_ACTIVE column is missing → defaults to True (active).
     EMP ID is the only required column. All others are optional.
+
+    NEW EMPLOYEES → auto-creates User account with temp password.
+    Returns credentials Excel file if any new employees were created.
+    Existing employees → updated only, no password change.
     """
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "Admin or HR access only"}, status=403)
@@ -315,10 +361,11 @@ def import_excel(request):
     df.columns = df.columns.str.strip()
     df = df.where(pd.notnull(df), None)
 
-    created = 0
-    updated = 0
-    skipped = 0
-    errors  = []
+    created          = 0
+    updated          = 0
+    skipped          = 0
+    errors           = []
+    new_credentials  = []   # [{emp_id, name, temp_password}]
 
     for idx, row in df.iterrows():
         row = row.to_dict()
@@ -332,7 +379,7 @@ def import_excel(request):
         # ── IS_ACTIVE ──────────────────────────────────
         raw_active = row.get("IS_ACTIVE")
         if raw_active is None or str(raw_active).strip() == "":
-            is_active = True          # default: active if column missing
+            is_active = True
         else:
             is_active = safe_bool(raw_active)
 
@@ -340,10 +387,12 @@ def import_excel(request):
         company  = safe_get(row, "COMPANY").strip().upper() or "UNKNOWN"
         division, _ = Division.objects.get_or_create(name=company)
 
+        emp_name = safe_get(row, "NAME") or f"EMP-{emp_id}"
+
         # ── Build defaults dict ────────────────────────
         defaults = {
             # Basic
-            "name":          safe_get(row, "NAME") or f"EMP-{emp_id}",
+            "name":          emp_name,
             "phone":         safe_get(row, "HP NUMBER") or None,
             "nationality":   safe_get(row, "NATIONALITY") or None,
             "dob":           safe_date(row.get("D.O.B")),
@@ -387,40 +436,111 @@ def import_excel(request):
             "lssc_sn":          safe_get(row, "LSSC S/N") or None,
 
             # Finance / Other
-            "bank_account": safe_get(row, "BANK ACCOUNT NUMBER") or None,
+            "bank_account":  safe_get(row, "BANK ACCOUNT NUMBER") or None,
             "accommodation": safe_get(row, "ACCOMODATION") or None,
             "pcp_status":    safe_get(row, "PCP STATUS") or None,
             "remarks":       safe_get(row, "REMARKS") or None,
         }
 
         try:
-            _, created_flag = Employee.objects.update_or_create(
+            employee, created_flag = Employee.objects.update_or_create(
                 emp_id=emp_id,
                 defaults=defaults,
             )
+
             if created_flag:
                 created += 1
+
+                # ── Auto-create User for NEW employees only ──
+                temp_password = generate_password()
+
+                user_obj, _ = User.objects.get_or_create(
+                    username=emp_id,
+                    defaults={"role": "employee"}
+                )
+                user_obj.set_password(temp_password)
+                user_obj.must_change_password = True
+                user_obj.save()
+
+                # Link user ↔ employee
+                employee.user = user_obj
+                employee.save(update_fields=["user"])
+
+                new_credentials.append({
+                    "emp_id":         emp_id,
+                    "name":           emp_name,
+                    "temp_password":  temp_password,
+                })
+
             else:
                 updated += 1
 
         except Exception as e:
             errors.append({
-                "row":    idx + 2,   # Excel row number (1-indexed + header)
+                "row":    idx + 2,
                 "emp_id": emp_id,
                 "error":  str(e),
             })
             skipped += 1
             continue
 
+    # ── If new employees exist → return credentials Excel ──────────
+    if new_credentials:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Credentials"
+
+        # Header row
+        header_fill  = openpyxl.styles.PatternFill("solid", fgColor="1565C0")
+        header_font  = openpyxl.styles.Font(bold=True, color="FFFFFF")
+        headers = ["EMP ID", "NAME", "TEMP PASSWORD", "NOTE"]
+        for col, h in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+
+        # Data rows
+        for i, cred in enumerate(new_credentials, 2):
+            ws.cell(row=i, column=1, value=cred["emp_id"])
+            ws.cell(row=i, column=2, value=cred["name"])
+            ws.cell(row=i, column=3, value=cred["temp_password"])
+            ws.cell(row=i, column=4, value="Employee must change password on first login")
+
+        # Column widths
+        ws.column_dimensions["A"].width = 15
+        ws.column_dimensions["B"].width = 30
+        ws.column_dimensions["C"].width = 20
+        ws.column_dimensions["D"].width = 52
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        response = HttpResponse(
+            buffer,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="employee_credentials.xlsx"'
+        response["X-Import-Created"]    = str(created)
+        response["X-Import-Updated"]    = str(updated)
+        response["X-Import-Skipped"]    = str(skipped)
+        response["X-Import-Total"]      = str(created + updated + skipped)
+        response["Access-Control-Expose-Headers"] = (
+            "X-Import-Created, X-Import-Updated, X-Import-Skipped, "
+            "X-Import-Total, Content-Disposition"
+        )
+        return response
+
+    # ── No new employees → normal JSON response ────────────────────
     response_data = {
-        "message": "Import completed",
-        "created": created,
-        "updated": updated,
-        "skipped": skipped,
+        "message":    "Import completed",
+        "created":    created,
+        "updated":    updated,
+        "skipped":    skipped,
         "total_rows": created + updated + skipped,
     }
     if errors:
-        response_data["errors"] = errors[:20]   # max 20 errors returned
+        response_data["errors"] = errors[:20]
 
     return Response(response_data)
 
@@ -488,7 +608,6 @@ def employee_list(request):
         today   = date.today()
         next_60 = today + timedelta(days=60)
         next_90 = today + timedelta(days=90)
-        # Only show expiry alerts for active employees (matching dashboard behavior)
         employees = employees.filter(is_active=True)
         if expiry_alert == "wp":
             employees = employees.filter(wp_expiry__range=(today, next_60))
@@ -545,28 +664,18 @@ def employee_detail(request, emp_id):
         return Response({"error": "Employee not found"}, status=404)
 
     if request.method == 'DELETE':
-        # Check if user is admin
         if not request.user.is_staff:
             return Response({"error": "Admin access required"}, status=403)
-
-        # Store employee info for response
         emp_info = {
-            "emp_id": e.emp_id,
-            "name": e.name,
+            "emp_id":   e.emp_id,
+            "name":     e.name,
             "division": e.division.name if e.division else None
         }
-
-        # Delete the employee
         e.delete()
+        return Response({"message": "Employee deleted successfully", "employee": emp_info})
 
-        return Response({
-            "message": "Employee deleted successfully",
-            "employee": emp_info
-        })
-
-    # GET request - return employee details
+    # GET
     return Response({
-        # Basic Info
         "emp_id":      e.emp_id,
         "name":        e.name,
         "phone":       e.phone,
@@ -577,34 +686,29 @@ def employee_detail(request, emp_id):
         "status":      "Active" if e.is_active else "Inactive",
         "qualification": e.qualification,
 
-        # Job Info
         "designation_ipa":  e.designation_ipa,
         "designation_aug":  e.designation_aug,
         "ipa_salary":       e.ipa_salary,
         "per_hr":           e.per_hr,
 
-        # Employment Dates
         "doa":                 e.doa,
         "arrival_date":        e.arrival_date,
         "date_joined_company": e.date_joined_company,
-        "experience_years":    e.experience_years,   # auto-calculated
+        "experience_years":    e.experience_years,
 
-        # Work Permit / IC
-        "work_permit_no": e.work_permit_no,
-        "fin_no":         e.fin_no,
-        "issue_date":     e.issue_date,
-        "ic_status":      e.ic_status,
-        "wp_expiry":      e.wp_expiry,
+        "work_permit_no":   e.work_permit_no,
+        "fin_no":           e.fin_no,
+        "issue_date":       e.issue_date,
+        "ic_status":        e.ic_status,
+        "wp_expiry":        e.wp_expiry,
         "wp_expiring_soon": e.wp_expiring_soon,
 
-        # Passport
-        "passport_no":          e.passport_no,
-        "passport_expiry":      e.passport_expiry,
-        "passport_issue_date":  e.passport_issue_date,
-        "passport_issue_place": e.passport_issue_place,
+        "passport_no":            e.passport_no,
+        "passport_expiry":        e.passport_expiry,
+        "passport_issue_date":    e.passport_issue_date,
+        "passport_issue_place":   e.passport_issue_place,
         "passport_expiring_soon": e.passport_expiring_soon,
 
-        # Certifications / Safety
         "ssic_gt_sn":  e.ssic_gt_sn,
         "ssic_gt_exp": e.ssic_gt_exp,
         "ssic_ht_sn":  e.ssic_ht_sn,
@@ -618,16 +722,12 @@ def employee_detail(request, emp_id):
         "firewatchman":      e.firewatchman,
         "gas_meter_carrier": e.gas_meter_carrier,
 
-        # Project Pass
         "dynamac_pass_sn":  e.dynamac_pass_sn,
         "dynamac_pass_exp": e.dynamac_pass_exp,
 
-        # Finance
         "salary":       e.salary,
-        "ipa_salary":   e.ipa_salary,
         "bank_account": e.bank_account,
 
-        # Other
         "accommodation":     e.accommodation,
         "pcp_status":        e.pcp_status,
         "security_bond_no":  e.security_bond_no,
@@ -714,7 +814,6 @@ def update_employee(request, emp_id):
             setattr(emp, field, val)
             updated_fields.append(field)
 
-    # String fields
     for f in [
         'phone', 'nationality', 'accommodation', 'qualification', 'remarks',
         'pcp_status', 'bank_account', 'work_permit_no', 'fin_no', 'passport_no',
@@ -727,7 +826,6 @@ def update_employee(request, emp_id):
         emp.name = request.data['name']
         updated_fields.append('name')
 
-    # Float fields
     for src_key, field_names in [
         ('salary', ['ipa_salary', 'salary']),
         ('per_hr', ['per_hr']),
@@ -741,7 +839,6 @@ def update_employee(request, emp_id):
                 setattr(emp, fn, val)
                 updated_fields.append(fn)
 
-    # Date fields
     date_fields = [
         'dob', 'issue_date', 'wp_expiry', 'passport_expiry', 'passport_issue_date',
         'doa', 'arrival_date', 'date_joined_company',
@@ -763,7 +860,6 @@ def update_employee(request, emp_id):
                 setattr(emp, df_field, None)
                 updated_fields.append(df_field)
 
-    # Boolean fields
     for bf in ['work_at_height', 'confined_space', 'signalman_rigger',
                'firewatchman', 'gas_meter_carrier']:
         if bf in request.data:

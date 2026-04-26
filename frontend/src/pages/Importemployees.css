@@ -850,3 +850,15 @@
     font-size: 12.5px;
   }
 }
+.credentials-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  font-size: 13.5px;
+  color: #15803d;
+}
