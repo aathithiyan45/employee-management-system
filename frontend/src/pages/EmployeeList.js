@@ -29,6 +29,13 @@ function EmployeeList() {
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
   const [incomplete, setIncomplete] = useState("");
+  const [user, setUser] = useState(null);
+
+  // Get user info from localStorage
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+    setUser(userData);
+  }, []);
 
   // ── Parse URL parameters on mount ──────────────────────
   useEffect(() => {
@@ -96,6 +103,27 @@ function EmployeeList() {
     currentPage,
     pageSize,
   ]);
+
+  // ── Handle Employee Deletion ───────────────────────────
+  const deleteEmployee = async (empId, empName) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete employee ${empName} (${empId})? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(`employees/${empId}/`);
+      // Refresh the employee list
+      fetchEmployees();
+      alert("Employee deleted successfully");
+    } catch (error) {
+      console.error("Error deleting employee:", error);
+      alert("Failed to delete employee. Please try again.");
+    }
+  };
 
   // ── Fetch Divisions ────────────────────────────────────
   useEffect(() => {
@@ -329,15 +357,28 @@ function EmployeeList() {
                     </span>
                   </td>
                   <td className="text-center">
-                    <button
-                      className="edit-btn"
-                      onClick={(ev) => {
-                        ev.stopPropagation();
-                        navigate(`/employees/${e.emp_id}/profile`);
-                      }}
-                    >
-                      Edit
-                    </button>
+                    <div className="action-buttons">
+                      <button
+                        className="edit-btn"
+                        onClick={(ev) => {
+                          ev.stopPropagation();
+                          navigate(`/employees/${e.emp_id}/profile`);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      {user?.role === "admin" && (
+                        <button
+                          className="delete-btn-small"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            deleteEmployee(e.emp_id, e.name);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

@@ -82,6 +82,38 @@
     box-shadow: 0 2px 8px rgba(21, 101, 192, 0.10);
 }
 
+.topbar-right {
+    display: flex;
+    align-items: center;
+}
+
+.delete-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border: 1.5px solid var(--danger);
+    border-radius: var(--radius-md);
+    background: var(--white);
+    color: var(--danger);
+    font-size: 13.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.delete-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.delete-btn:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--white);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.20);
+}
+
 /* ── Hero ─────────────────────────────────────────────– */
 .detail-hero {
     display: flex;

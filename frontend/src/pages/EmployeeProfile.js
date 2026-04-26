@@ -11,8 +11,15 @@ function EmployeeProfile() {
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState({});
   const [formData, setFormData] = useState({});
+  const [user, setUser] = useState(null);
 
   const val = (v) => (v !== null && v !== undefined && v !== "" ? v : "—");
+
+  // Get user info from localStorage
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem("user") || "{}");
+    setUser(userData);
+  }, []);
 
   // ── Fetch Employee Data ──────────────────────────────────
   const fetchEmployee = useCallback(async () => {
@@ -56,6 +63,26 @@ function EmployeeProfile() {
     }
   };
 
+  // ── Handle Employee Deletion ───────────────────────────
+  const deleteEmployee = async () => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete employee ${emp?.name} (${emp?.emp_id})? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(`employees/${empId}/`);
+      alert("Employee deleted successfully");
+      navigate("/employees");
+    } catch (error) {
+      console.error("Error deleting employee:", error);
+      alert("Failed to delete employee. Please try again.");
+    }
+  };
+
   if (loading)
     return (
       <div className="detail-loading">
@@ -93,6 +120,21 @@ function EmployeeProfile() {
             Back to List
           </button>
         </div>
+        {user?.role === "admin" && (
+          <div className="topbar-right">
+            <button className="delete-btn" onClick={deleteEmployee}>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+              </svg>
+              Delete Employee
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── HERO CARD ─────────────────────────────────── */}

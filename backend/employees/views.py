@@ -536,7 +536,7 @@ def employee_list(request):
 # EMPLOYEE DETAIL
 # ─────────────────────────────────────────────
 
-@api_view(['GET'])
+@api_view(['GET', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def employee_detail(request, emp_id):
     try:
@@ -544,6 +544,27 @@ def employee_detail(request, emp_id):
     except Employee.DoesNotExist:
         return Response({"error": "Employee not found"}, status=404)
 
+    if request.method == 'DELETE':
+        # Check if user is admin
+        if not request.user.is_staff:
+            return Response({"error": "Admin access required"}, status=403)
+
+        # Store employee info for response
+        emp_info = {
+            "emp_id": e.emp_id,
+            "name": e.name,
+            "division": e.division.name if e.division else None
+        }
+
+        # Delete the employee
+        e.delete()
+
+        return Response({
+            "message": "Employee deleted successfully",
+            "employee": emp_info
+        })
+
+    # GET request - return employee details
     return Response({
         # Basic Info
         "emp_id":      e.emp_id,
