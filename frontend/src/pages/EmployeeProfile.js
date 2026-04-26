@@ -11,7 +11,6 @@ function EmployeeProfile() {
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState({});
   const [formData, setFormData] = useState({});
-  const [adminEditMode, setAdminEditMode] = useState(false);
 
   const val = (v) => (v !== null && v !== undefined && v !== "" ? v : "—");
 
@@ -94,17 +93,6 @@ function EmployeeProfile() {
             Back to List
           </button>
         </div>
-        <div className="topbar-right">
-          <label className="admin-toggle">
-            <input
-              type="checkbox"
-              checked={adminEditMode}
-              onChange={(e) => setAdminEditMode(e.target.checked)}
-            />
-            <span className="toggle-slider-sm"></span>
-            <span className="toggle-text-sm">Edit Mode</span>
-          </label>
-        </div>
       </div>
 
       {/* ── HERO CARD ─────────────────────────────────── */}
@@ -147,7 +135,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, phone: v })}
             onSave={() => saveField("phone")}
             onCancel={() => cancelEditing("phone")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="Nationality"
@@ -158,7 +145,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, nationality: v })}
             onSave={() => saveField("nationality")}
             onCancel={() => cancelEditing("nationality")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="Date of Birth"
@@ -169,7 +155,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, dob: v })}
             onSave={() => saveField("dob")}
             onCancel={() => cancelEditing("dob")}
-            adminEditMode={adminEditMode}
             type="date"
           />
           <EditField
@@ -201,7 +186,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, designation_ipa: v })}
             onSave={() => saveField("designation_ipa")}
             onCancel={() => cancelEditing("designation_ipa")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="Aug Designation"
@@ -212,7 +196,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, designation_aug: v })}
             onSave={() => saveField("designation_aug")}
             onCancel={() => cancelEditing("designation_aug")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="IPA Salary"
@@ -223,7 +206,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, ipa_salary: v })}
             onSave={() => saveField("ipa_salary")}
             onCancel={() => cancelEditing("ipa_salary")}
-            adminEditMode={adminEditMode}
             type="number"
           />
           <EditField
@@ -235,7 +217,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, per_hr: v })}
             onSave={() => saveField("per_hr")}
             onCancel={() => cancelEditing("per_hr")}
-            adminEditMode={adminEditMode}
             type="number"
           />
           <EditField
@@ -247,7 +228,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, bank_account: v })}
             onSave={() => saveField("bank_account")}
             onCancel={() => cancelEditing("bank_account")}
-            adminEditMode={adminEditMode}
           />
         </Section>
 
@@ -262,7 +242,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, work_permit_no: v })}
             onSave={() => saveField("work_permit_no")}
             onCancel={() => cancelEditing("work_permit_no")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="FIN No"
@@ -273,7 +252,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, fin_no: v })}
             onSave={() => saveField("fin_no")}
             onCancel={() => cancelEditing("fin_no")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="Issue Date"
@@ -284,7 +262,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, issue_date: v })}
             onSave={() => saveField("issue_date")}
             onCancel={() => cancelEditing("issue_date")}
-            adminEditMode={adminEditMode}
             type="date"
           />
           <EditField
@@ -296,7 +273,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, wp_expiry: v })}
             onSave={() => saveField("wp_expiry")}
             onCancel={() => cancelEditing("wp_expiry")}
-            adminEditMode={adminEditMode}
             type="date"
           />
           <EditField
@@ -308,7 +284,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, ic_status: v })}
             onSave={() => saveField("ic_status")}
             onCancel={() => cancelEditing("ic_status")}
-            adminEditMode={adminEditMode}
           />
         </Section>
 
@@ -323,7 +298,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, passport_no: v })}
             onSave={() => saveField("passport_no")}
             onCancel={() => cancelEditing("passport_no")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="Expiry"
@@ -334,7 +308,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, passport_expiry: v })}
             onSave={() => saveField("passport_expiry")}
             onCancel={() => cancelEditing("passport_expiry")}
-            adminEditMode={adminEditMode}
             type="date"
           />
           <EditField
@@ -348,7 +321,6 @@ function EmployeeProfile() {
             }
             onSave={() => saveField("passport_issue_date")}
             onCancel={() => cancelEditing("passport_issue_date")}
-            adminEditMode={adminEditMode}
             type="date"
           />
           <EditField
@@ -362,7 +334,6 @@ function EmployeeProfile() {
             }
             onSave={() => saveField("passport_issue_place")}
             onCancel={() => cancelEditing("passport_issue_place")}
-            adminEditMode={adminEditMode}
           />
         </Section>
 
@@ -377,7 +348,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, doa: v })}
             onSave={() => saveField("doa")}
             onCancel={() => cancelEditing("doa")}
-            adminEditMode={adminEditMode}
             type="date"
           />
           <EditField
@@ -389,7 +359,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, arrival_date: v })}
             onSave={() => saveField("arrival_date")}
             onCancel={() => cancelEditing("arrival_date")}
-            adminEditMode={adminEditMode}
             type="date"
           />
           <EditField
@@ -401,7 +370,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, accommodation: v })}
             onSave={() => saveField("accommodation")}
             onCancel={() => cancelEditing("accommodation")}
-            adminEditMode={adminEditMode}
           />
           <EditField
             label="PCP Status"
@@ -412,7 +380,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, pcp_status: v })}
             onSave={() => saveField("pcp_status")}
             onCancel={() => cancelEditing("pcp_status")}
-            adminEditMode={adminEditMode}
           />
         </Section>
 
@@ -427,7 +394,6 @@ function EmployeeProfile() {
             onChange={(v) => setFormData({ ...formData, qualification: v })}
             onSave={() => saveField("qualification")}
             onCancel={() => cancelEditing("qualification")}
-            adminEditMode={adminEditMode}
           />
         </Section>
 
@@ -462,14 +428,12 @@ function EmployeeProfile() {
               ) : (
                 <div className="remarks-view">
                   <p className="remarks-text">{formData.remarks}</p>
-                  {adminEditMode && (
-                    <button
-                      className="edit-btn-inline"
-                      onClick={() => startEditing("remarks")}
-                    >
-                      ✏️ Edit
-                    </button>
-                  )}
+                  <button
+                    className="edit-btn-inline"
+                    onClick={() => startEditing("remarks")}
+                  >
+                    ✏️ Edit
+                  </button>
                 </div>
               )}
             </div>
@@ -503,7 +467,6 @@ function EditField({
   onChange,
   onSave,
   onCancel,
-  adminEditMode,
   type = "text",
   editable = true,
 }) {
@@ -517,7 +480,7 @@ function EditField({
   }
 
   return (
-    <div className="detail-field">
+    <div className={`detail-field ${field ? "editable" : ""}`}>
       <div className="detail-field-label">{label}</div>
       {isEditing ? (
         <div className="field-edit-mode">
@@ -528,35 +491,25 @@ function EditField({
             className="detail-input"
             autoFocus
           />
-          <div className="edit-actions-inline">
-            <button className="save-btn-sm" onClick={onSave} title="Save">
-              ✓
+          <div className="edit-actions-stacked">
+            <button className="save-btn-full" onClick={onSave} title="Save">
+              ✓ Save
             </button>
-            <button className="cancel-btn-sm" onClick={onCancel} title="Cancel">
-              ✕
+            <button
+              className="cancel-btn-full"
+              onClick={onCancel}
+              title="Cancel"
+            >
+              ✕ Cancel
             </button>
           </div>
         </div>
       ) : (
         <div
-          className={`detail-field-value ${
-            adminEditMode && field ? "editable-field" : ""
-          }`}
-          onClick={() => adminEditMode && field && onEdit && onEdit()}
+          className={`detail-field-value ${field ? "editable-field" : ""}`}
+          onClick={() => field && onEdit && onEdit()}
         >
           {value}
-          {adminEditMode && field && (
-            <button
-              className="edit-btn-small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              title="Edit"
-            >
-              ✏️
-            </button>
-          )}
         </div>
       )}
     </div>
