@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import (
     Employee, Division, User,
@@ -165,6 +166,31 @@ def login_view(request):
         {"status": "error", "message": "Invalid credentials"},
         status=401,
     )
+
+
+# ─────────────────────────────────────────────
+# LOGOUT — blacklists the refresh token
+# ─────────────────────────────────────────────
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def logout_view(request):
+    """
+    Invalidate the supplied refresh token so it cannot be used to obtain
+    new access tokens after logout.  The client must also clear its own
+    localStorage / cookie store.
+    """
+    refresh_token = request.data.get('refresh')
+    if not refresh_token:
+        return Response({'error': 'refresh token is required'}, status=400)
+
+    try:
+        token = RefreshToken(refresh_token)
+        token.blacklist()          # requires rest_framework_simplejwt.token_blacklist in INSTALLED_APPS
+    except TokenError as e:
+        return Response({'error': str(e)}, status=400)
+
+    return Response({'message': 'Successfully logged out.'})
 
 
 # ─────────────────────────────────────────────

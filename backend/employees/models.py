@@ -4,9 +4,14 @@ Covers: User, Division, Employee, LeaveBalance, LeaveRequest, LeaveAdjustmentLog
 """
 
 from django.contrib.auth.models import AbstractUser
-from django.db import models
+from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
+
+def get_current_year():
+    """Callable default for LeaveBalance.year — evaluated per-instance, not at class load."""
+    return timezone.now().year
 from datetime import date
 
 
@@ -218,7 +223,7 @@ class LeaveBalance(models.Model):
         on_delete=models.CASCADE,
         related_name='leave_balances'
     )
-    year = models.PositiveIntegerField(default=timezone.now().year)
+    year = models.PositiveIntegerField(default=get_current_year)
 
     # Entitlement
     medical_entitled = models.IntegerField(default=14)
@@ -415,28 +420,43 @@ class LeaveRequest(models.Model):
         )
 
     def approve(self, reviewed_by: User):
-        if self.status != self.STATUS_PENDING:
-            raise ValidationError("Only pending requests can be approved.")
+        with transaction.atomic():
+            # Re-fetch this request with a row lock so concurrent approvals are serialised
+            lr = LeaveRequest.objects.select_for_update().get(pk=self.pk)
+            if lr.status != self.STATUS_PENDING:
+                raise ValidationError("Only pending requests can be approved.")
 
-        if self.leave_type != self.LEAVE_UNPAID:
-            balance = LeaveBalance.objects.get(
-                employee=self.employee,
-                year=self.start_date.year
+            if lr.leave_type != self.LEAVE_UNPAID:
+                balance = LeaveBalance.objects.select_for_update().get(
+                    employee=lr.employee,
+                    year=lr.start_date.year
+                )
+                # Re-check balance inside the lock — prevents double-spend
+                if not balance.has_sufficient_balance(lr.leave_type, lr.total_days):
+                    raise ValidationError(
+                        f"Insufficient {lr.leave_type} balance inside lock. "
+                        f"Remaining: {balance.get_remaining(lr.leave_type)}, "
+                        f"Requested: {lr.total_days}"
+                    )
+                balance.deduct(lr.leave_type, lr.total_days)
+
+            lr.status = self.STATUS_APPROVED
+            lr.reviewed_by = reviewed_by
+            lr.reviewed_at = timezone.now()
+            lr.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'])
+
+            LeaveAdjustmentLog.objects.create(
+                employee=lr.employee,
+                leave_request=lr,
+                action='approved',
+                performed_by=reviewed_by,
+                note=f"Approved {lr.total_days} day(s) of {lr.get_leave_type_display()}."
             )
-            balance.deduct(self.leave_type, self.total_days)
 
-        self.status = self.STATUS_APPROVED
-        self.reviewed_by = reviewed_by
-        self.reviewed_at = timezone.now()
-        self.save(update_fields=['status', 'reviewed_by', 'reviewed_at', 'updated_at'])
-
-        LeaveAdjustmentLog.objects.create(
-            employee=self.employee,
-            leave_request=self,
-            action='approved',
-            performed_by=reviewed_by,
-            note=f"Approved {self.total_days} day(s) of {self.get_leave_type_display()}."
-        )
+            # Sync instance state so callers see the updated values
+            self.status = lr.status
+            self.reviewed_by = lr.reviewed_by
+            self.reviewed_at = lr.reviewed_at
 
     def reject(self, reviewed_by: User, reason: str = ''):
         if self.status != self.STATUS_PENDING:

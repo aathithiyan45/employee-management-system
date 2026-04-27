@@ -38,4 +38,26 @@ api.interceptors.response.use(
   }
 );
 
+/**
+ * logout() — blacklists the refresh token on the server, then clears local state.
+ * Call this instead of directly clearing localStorage so the old refresh token
+ * cannot be replayed after the user signs out.
+ *
+ * Usage (replace any existing localStorage.clear() + redirect pattern):
+ *   import { logout } from "../axiosInstance";
+ *   <button onClick={logout}>Sign out</button>
+ */
+export async function logout() {
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  if (user?.refresh) {
+    try {
+      await api.post("logout/", { refresh: user.refresh });
+    } catch {
+      // If the server call fails (token already expired etc.) still clear local state
+    }
+  }
+  localStorage.clear();
+  window.location.href = "/";
+}
+
 export default api;
