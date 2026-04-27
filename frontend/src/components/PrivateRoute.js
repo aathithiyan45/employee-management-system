@@ -7,7 +7,7 @@ function PrivateRoute({ children, requiredRole }) {
 
   if (requiredRole && user.role !== requiredRole) {
     if (user.role === "admin") return <Navigate to="/dashboard" replace />;
-    if (user.role === "employee") return <Navigate to="/profile" replace />;
+    if (user.role === "employee") return <Navigate to="/employee/dashboard" replace />;
     return <Navigate to="/" replace />;
   }
 

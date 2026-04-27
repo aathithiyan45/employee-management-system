@@ -8,6 +8,7 @@ from .views import (
 
     # Dashboard
     dashboard_view,
+    employee_dashboard_view,
 
     # Charts
     chart_division_distribution,
@@ -53,6 +54,7 @@ urlpatterns = [
 
     # ── Dashboard ───────────────────────────────
     path('dashboard/',       dashboard_view),
+    path('employee-dashboard/', employee_dashboard_view),
 
     # ── Charts ──────────────────────────────────
     path('charts/division-distribution/', chart_division_distribution),

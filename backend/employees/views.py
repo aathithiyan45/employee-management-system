@@ -211,6 +211,73 @@ def dashboard_view(request):
 
 
 # ─────────────────────────────────────────────
+# EMPLOYEE DASHBOARD
+# ─────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def employee_dashboard_view(request):
+    if not hasattr(request.user, 'employee_profile'):
+        return Response({"error": "Unauthorized. Employee profile not found."}, status=403)
+    
+    if request.user.role != "employee":
+        return Response({"error": "Forbidden. Only employees can access this dashboard."}, status=403)
+
+    emp = request.user.employee_profile
+    today = date.today()
+
+    # Get Leave Balance
+    try:
+        balance = LeaveBalance.objects.get(employee=emp, year=today.year)
+        leave_balance_remaining = balance.annual_remaining + balance.casual_remaining + balance.medical_remaining
+    except LeaveBalance.DoesNotExist:
+        leave_balance_remaining = 0
+
+    # Get Pending Requests Count
+    pending_requests = LeaveRequest.objects.filter(employee=emp, status=LeaveRequest.STATUS_PENDING).count()
+
+    # Get Upcoming Leaves
+    upcoming_leaves = LeaveRequest.objects.filter(
+        employee=emp, 
+        status=LeaveRequest.STATUS_APPROVED, 
+        start_date__gte=today
+    ).count()
+
+    # Recent leaves (limit 5)
+    recent_leaves_qs = LeaveRequest.objects.filter(employee=emp).order_by('-created_at')[:5]
+    recent_leaves = [
+        {
+            "id": lr.id,
+            "type": lr.get_leave_type_display(),
+            "start_date": lr.start_date,
+            "end_date": lr.end_date,
+            "total_days": lr.total_days,
+            "status": lr.get_status_display()
+        }
+        for lr in recent_leaves_qs
+    ]
+
+    return Response({
+        "user": {
+            "name": emp.name,
+            "emp_id": emp.emp_id,
+            "role": emp.designation_aug or emp.designation_ipa or "Employee",
+            "division": emp.division.name if emp.division else "N/A"
+        },
+        "summary": {
+            "leave_balance": leave_balance_remaining,
+            "pending_requests": pending_requests,
+            "upcoming_leaves": upcoming_leaves
+        },
+        "documents": {
+            "passport_expiring": emp.passport_expiring_soon,
+            "wp_expiring": emp.wp_expiring_soon
+        },
+        "recent_leaves": recent_leaves
+    })
+
+
+# ─────────────────────────────────────────────
 # CHARTS
 # ─────────────────────────────────────────────
 

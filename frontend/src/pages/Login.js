@@ -44,7 +44,7 @@ function Login() {
       }
 
       if (data.role === "admin") navigate("/dashboard");
-      else navigate("/profile");
+      else navigate("/employee/dashboard");
 
     } catch {
       alert("Invalid credentials");

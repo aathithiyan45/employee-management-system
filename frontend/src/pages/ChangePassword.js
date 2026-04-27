@@ -28,7 +28,7 @@ function ChangePassword() {
       localStorage.setItem("user", JSON.stringify(updated));
 
       // Redirect based on role
-      navigate(user.role === "admin" ? "/dashboard" : "/profile");
+      navigate(user.role === "admin" ? "/dashboard" : "/employee/dashboard");
     } catch (err) {
       setError(err.response?.data?.error || "Failed to change password");
     } finally {

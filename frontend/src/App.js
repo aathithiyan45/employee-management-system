@@ -4,6 +4,7 @@ import Dashboard from "./pages/Dashboard";
 import EmployeeList from "./pages/EmployeeList";
 import EmployeeDetail from "./pages/EmployeeDetail";
 import EmployeeProfile from "./pages/EmployeeProfile";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
 import Profile from "./components/Profile";
 import ImportEmployees from "./pages/Importemployees";
 import LeaveManagement from "./pages/LeaveManagement";
@@ -29,6 +30,7 @@ function App() {
         <Route path="/leave/balance/:empId" element={<PrivateRoute requiredRole="admin"><LeaveBalance /></PrivateRoute>} />
 
         {/* Employee only */}
+        <Route path="/employee/dashboard" element={<PrivateRoute requiredRole="employee"><EmployeeDashboard /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute requiredRole="employee"><Profile /></PrivateRoute>} />
 
         {/* Catch-all */}
