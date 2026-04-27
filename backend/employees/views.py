@@ -695,8 +695,11 @@ def employee_list(request):
         )
 
     paginator = PageNumberPagination()
-    paginator.page_size = int(request.GET.get('page_size', 15))
+    # Cap page_size to prevent full-table dumps via ?page_size=999999
+    paginator.page_size = min(int(request.GET.get('page_size', 15)), 100)
     result_page = paginator.paginate_queryset(employees, request)
+
+    is_privileged = request.user.role in ('admin', 'hr')
 
     data = [
         {
@@ -706,7 +709,8 @@ def employee_list(request):
             "designation":      e.designation_aug,
             "division":         e.division.name,
             "status":           "Active" if e.is_active else "Inactive",
-            "salary":           e.ipa_salary,
+            # Salary is sensitive — only admin/hr can see it
+            **({"salary": e.ipa_salary} if is_privileged else {}),
             "date_joined":      e.date_joined_company,
             "experience_years": e.experience_years,
             "wp_expiry":        e.wp_expiry,
@@ -731,7 +735,8 @@ def employee_detail(request, emp_id):
         return Response({"error": "Employee not found"}, status=404)
 
     if request.method == 'DELETE':
-        if not request.user.is_staff:
+        # Fix: use role check — not is_staff (a separate, unrelated Django flag)
+        if request.user.role != 'admin':
             return Response({"error": "Admin access required"}, status=403)
         emp_info = {
             "emp_id":   e.emp_id,
@@ -741,8 +746,21 @@ def employee_detail(request, emp_id):
         e.delete()
         return Response({"message": "Employee deleted successfully", "employee": emp_info})
 
-    # GET
-    return Response({
+    # GET — enforce access control
+    is_privileged = request.user.role in ('admin', 'hr')
+    viewer_profile = getattr(request.user, 'employee_profile', None)
+    is_own_profile = (
+        request.user.role == 'employee'
+        and viewer_profile is not None
+        and viewer_profile.emp_id == emp_id
+    )
+
+    # Regular employees may only view their own record
+    if not is_privileged and not is_own_profile:
+        return Response({"error": "Permission denied"}, status=403)
+
+    # Base fields — safe for all authenticated users who pass the access check
+    response_data = {
         "emp_id":      e.emp_id,
         "name":        e.name,
         "phone":       e.phone,
@@ -755,8 +773,6 @@ def employee_detail(request, emp_id):
 
         "designation_ipa":  e.designation_ipa,
         "designation_aug":  e.designation_aug,
-        "ipa_salary":       e.ipa_salary,
-        "per_hr":           e.per_hr,
 
         "doa":                 e.doa,
         "arrival_date":        e.arrival_date,
@@ -792,15 +808,23 @@ def employee_detail(request, emp_id):
         "dynamac_pass_sn":  e.dynamac_pass_sn,
         "dynamac_pass_exp": e.dynamac_pass_exp,
 
-        "salary":       e.salary,
-        "bank_account": e.bank_account,
-
         "accommodation":     e.accommodation,
         "pcp_status":        e.pcp_status,
         "security_bond_no":  e.security_bond_no,
         "security_bond_exp": e.security_bond_exp,
         "remarks":           e.remarks,
-    })
+    }
+
+    # Sensitive financial fields — admin and HR only
+    if is_privileged:
+        response_data.update({
+            "ipa_salary":   e.ipa_salary,
+            "per_hr":       e.per_hr,
+            "salary":       e.salary,
+            "bank_account": e.bank_account,
+        })
+
+    return Response(response_data)
 
 
 # ─────────────────────────────────────────────
@@ -810,6 +834,10 @@ def employee_detail(request, emp_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def export_employees(request):
+    # Export contains salary and bank data — admin and HR only
+    if request.user.role not in ('admin', 'hr'):
+        return Response({"error": "Admin or HR access required"}, status=403)
+
     division = request.GET.get("division")
 
     qs = Employee.objects.select_related("division").all()
@@ -867,6 +895,10 @@ def export_employees(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def update_employee(request, emp_id):
+    # Fix IDOR: only admin or HR may update any employee record
+    if request.user.role not in ('admin', 'hr'):
+        return Response({"error": "Admin or HR access required"}, status=403)
+
     try:
         emp = Employee.objects.get(emp_id=emp_id)
     except Employee.DoesNotExist:
