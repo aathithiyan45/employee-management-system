@@ -10,10 +10,11 @@ from django.contrib.auth import authenticate
 from django.db.models import Q, Count
 from django.core.exceptions import ValidationError
 
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import (
@@ -89,12 +90,41 @@ def generate_password(length=10):
             return pwd
 
 
+
+# ─────────────────────────────────────────────
+# CUSTOM THROTTLE — LOGIN
+# ─────────────────────────────────────────────
+
+class LoginRateThrottle(AnonRateThrottle):
+    """
+    Applies the 'login' rate limit scope defined in settings.py:
+        'login': '10/minute'
+    Throttles by IP address (REMOTE_ADDR). Returns HTTP 429 when
+    the limit is exceeded, with a Retry-After header so clients
+    know exactly how long to wait.
+    """
+    scope = 'login'
+
+
 # ─────────────────────────────────────────────
 # AUTH
 # ─────────────────────────────────────────────
 
 @api_view(['POST'])
+@throttle_classes([LoginRateThrottle])
 def login_view(request):
+    """
+    Authenticate and return JWT tokens.
+
+    Rate-limited to 10 attempts per minute per IP via LoginRateThrottle.
+    On the 11th attempt within 60 s, DRF returns HTTP 429 with a
+    Retry-After header automatically — no extra code needed here.
+
+    Security note: we always return the same generic "Invalid credentials"
+    message whether the username doesn't exist OR the password is wrong.
+    This prevents username enumeration (an attacker learning which emp_ids
+    are valid accounts by observing different error messages).
+    """
     username_input = request.data.get("username")
     password = request.data.get("password")
 
@@ -104,8 +134,11 @@ def login_view(request):
             status=400,
         )
 
+    # Primary authentication attempt
     user = authenticate(username=username_input, password=password)
 
+    # Secondary attempt: in case the input was an emp_id rather than username
+    # (kept for backwards compatibility — both paths produce the same error)
     if user is None:
         try:
             emp_user = User.objects.get(username=username_input)
@@ -118,16 +151,20 @@ def login_view(request):
         refresh = RefreshToken.for_user(user)
 
         return Response({
-            "status": "success",
-            "username": user.username,
-            "role": user.role,
+            "status":               "success",
+            "username":             user.username,
+            "role":                 user.role,
             "must_change_password": user.must_change_password,
-            "emp_id": emp.emp_id if emp else None,
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+            "emp_id":               emp.emp_id if emp else None,
+            "access":               str(refresh.access_token),
+            "refresh":              str(refresh),
         })
 
-    return Response({"status": "error", "message": "Invalid credentials"}, status=401)
+    # Generic message — intentionally does NOT reveal whether the username exists
+    return Response(
+        {"status": "error", "message": "Invalid credentials"},
+        status=401,
+    )
 
 
 # ─────────────────────────────────────────────
@@ -396,6 +433,74 @@ def chart_designation_breakdown(request):
 
 
 # ─────────────────────────────────────────────
+# FILE UPLOAD VALIDATION HELPER
+# ─────────────────────────────────────────────
+
+# Maximum allowed upload sizes
+EXCEL_MAX_BYTES      = 10 * 1024 * 1024   # 10 MB  — Excel imports
+ATTACHMENT_MAX_BYTES =  5 * 1024 * 1024   #  5 MB  — Leave attachments
+
+# Allowed Excel magic-byte signatures (first 8 bytes of file)
+# xlsx / xlsm → PK zip header (50 4B 03 04)
+# xls         → Compound Document header (D0 CF 11 E0 A1 B1 1A E1)
+EXCEL_MAGIC = {
+    b'\x50\x4b\x03\x04',           # xlsx / xlsm (ZIP-based)
+    b'\xd0\xcf\x11\xe0',           # xls  (Compound Document)
+}
+
+# Allowed leave-attachment signatures
+ATTACHMENT_MAGIC = {
+    b'\x25\x50\x44\x46',           # PDF  (%PDF)
+    b'\x89\x50\x4e\x47',           # PNG
+    b'\xff\xd8\xff',               # JPEG
+    b'\x50\x4b\x03\x04',           # DOCX (ZIP-based)
+}
+
+EXCEL_EXTENSIONS      = {'.xlsx', '.xls', '.xlsm'}
+ATTACHMENT_EXTENSIONS = {'.pdf', '.png', '.jpg', '.jpeg', '.docx'}
+
+
+def validate_upload(file, allowed_extensions, allowed_magic, max_bytes):
+    """
+    Three-layer file validation:
+      1. Size  — reject files that exceed max_bytes
+      2. Extension — reject disallowed file extensions
+      3. Magic bytes — read the actual first bytes of the file to confirm
+                       the content matches its claimed type.
+                       This catches renamed files (e.g. malware.xlsx).
+
+    Returns (True, None) on success.
+    Returns (False, "human-readable error message") on failure.
+    """
+    # Layer 1 — Size check (cheap, do it first)
+    if file.size > max_bytes:
+        limit_mb = max_bytes // (1024 * 1024)
+        return False, f"File too large. Maximum allowed size is {limit_mb} MB."
+
+    # Layer 2 — Extension check (case-insensitive)
+    import os
+    _, ext = os.path.splitext(file.name.lower())
+    if ext not in allowed_extensions:
+        return False, (
+            f"Invalid file type '{ext}'. "
+            f"Allowed: {', '.join(sorted(allowed_extensions))}"
+        )
+
+    # Layer 3 — Magic bytes (read first 8 bytes from actual file content)
+    header = file.read(8)
+    file.seek(0)   # reset so subsequent readers (e.g. Pandas) start at byte 0
+
+    matched = any(header.startswith(magic) for magic in allowed_magic)
+    if not matched:
+        return False, (
+            "File content does not match its extension. "
+            "Upload a genuine Excel file."
+        )
+
+    return True, None
+
+
+# ─────────────────────────────────────────────
 # EXCEL IMPORT — with auto user creation
 # ─────────────────────────────────────────────
 
@@ -418,6 +523,16 @@ def import_excel(request):
     file = request.FILES.get('file')
     if not file:
         return Response({"error": "No file uploaded"}, status=400)
+
+    # Validate size, extension, and magic bytes before Pandas touches the file
+    ok, err = validate_upload(
+        file,
+        allowed_extensions=EXCEL_EXTENSIONS,
+        allowed_magic=EXCEL_MAGIC,
+        max_bytes=EXCEL_MAX_BYTES,
+    )
+    if not ok:
+        return Response({"error": err}, status=400)
 
     try:
         df = pd.read_excel(file, sheet_name=0, dtype=str)
@@ -610,18 +725,6 @@ def import_excel(request):
         response_data["errors"] = errors[:20]
 
     return Response(response_data)
-
-
-# ─────────────────────────────────────────────
-# CLEAR DB  ⚠️  REMOVE BEFORE PRODUCTION
-# ─────────────────────────────────────────────
-
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated, IsAdminUser])
-def clear_db(request):
-    Employee.objects.all().delete()
-    Division.objects.all().delete()
-    return Response({"message": "DB cleaned"})
 
 
 # ─────────────────────────────────────────────
@@ -1207,7 +1310,16 @@ def leave_request_list(request):
             reason=reason,
         )
         if 'attachment' in request.FILES:
-            lr.attachment = request.FILES['attachment']
+            attachment = request.FILES['attachment']
+            ok, err = validate_upload(
+                attachment,
+                allowed_extensions=ATTACHMENT_EXTENSIONS,
+                allowed_magic=ATTACHMENT_MAGIC,
+                max_bytes=ATTACHMENT_MAX_BYTES,
+            )
+            if not ok:
+                return Response({"error": f"Attachment invalid — {err}"}, status=400)
+            lr.attachment = attachment
         lr.save()
     except ValidationError as e:
         return Response({"error": str(e)}, status=400)

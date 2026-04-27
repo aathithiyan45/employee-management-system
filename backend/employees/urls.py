@@ -40,9 +40,6 @@ from .views import (
 
     # Leave — Audit
     leave_audit_log,
-
-    # Dev utility
-    clear_db,
 )
 
 urlpatterns = [
@@ -86,7 +83,4 @@ urlpatterns = [
 
     # ── Leave — Audit Log ───────────────────────
     path('leave/audit/',                       leave_audit_log),
-
-    # ── Dev Utility (remove before production) ──
-    path('clear-db/',        clear_db),
 ]
