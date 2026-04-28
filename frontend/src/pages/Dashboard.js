@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../axiosInstance";
+import api, { logout } from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
 import {
   Chart as ChartJS,
@@ -233,12 +233,9 @@ function Dashboard() {
     }
   };
 
-  // ── Logout — clear all local storage keys ────────────────
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("selectedDivision");
-    navigate("/");
-  };
+  // logout() calls POST /api/logout/ to blacklist the refresh token on the
+  // server before clearing localStorage — prevents token replay after sign-out.
+  const handleLogout = () => logout();
 
   // ── Stat card click → navigate to employees with filters ─
   const getCardFilter = (label) => {

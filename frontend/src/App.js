@@ -13,7 +13,8 @@ import ImportEmployees from "./pages/Importemployees";
 import LeaveManagement from "./pages/LeaveManagement";
 import LeaveBalance   from "./pages/LeaveBalance";
 import ChangePassword from "./pages/ChangePassword";
-import PrivateRoute   from "./components/Privateroute";
+
+import PrivateRoute from "./components/PrivateRoute";
 
 import "./App.css";
 

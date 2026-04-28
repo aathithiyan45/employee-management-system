@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../axiosInstance";
+import api, { logout } from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
 import "./HRDashboard.css";
 
@@ -223,6 +223,10 @@ function HRDashboard() {
             <button className="topbar-btn primary" onClick={() => navigate("/leave")}>
               <Icon d="M3 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM16 2v4M8 2v4M3 10h18" size={15} stroke="white" />
               All Leave Requests
+            </button>
+            <button className="topbar-btn" onClick={logout}>
+              <Icon d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" size={15} />
+              Sign Out
             </button>
           </div>
         </div>

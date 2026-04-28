@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
+import { logout } from "../axiosInstance";
 
 // ── Icons ─────────────────────────────────────────────────
 const Icon = ({ d, size = 17 }) => (
@@ -55,13 +56,9 @@ function Sidebar() {
   const sections  = NAV_BY_ROLE[role] || EMPLOYEE_NAV;
   const subtitle  = SUBTITLE_BY_ROLE[role] || "Portal";
 
-  const handleLogout = () => {
-    localStorage.removeItem("user");
-    localStorage.removeItem("access");
-    localStorage.removeItem("refresh");
-    localStorage.removeItem("selectedDivision");
-    navigate("/");
-  };
+  // logout() calls POST /api/logout/ to blacklist the refresh token on the
+  // server before clearing localStorage — prevents token replay after sign-out.
+  const handleLogout = () => logout();
 
   return (
     <aside className="sidebar">

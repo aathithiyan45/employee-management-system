@@ -26,3 +26,7 @@ build/
 # IDE
 .vscode/
 .idea/
+
+# Dangerous one-off scripts
+clear_db.py
+reset_db.py
