@@ -179,3 +179,55 @@ SIMPLE_JWT = {
     'ALGORITHM':                   'HS256',
     'AUTH_HEADER_TYPES':           ('Bearer',),
 }
+
+# ─────────────────────────────────────────────
+# LOGGING
+# Structured logging for all environments.
+# In production, swap the console formatter to 'json'
+# after installing python-json-logger:
+#   pip install python-json-logger
+# ─────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        # Uncomment and install python-json-logger for production:
+        # 'json': {
+        #     '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+        #     'format': '%(asctime)s %(levelname)s %(name)s %(message)s',
+        # },
+    },
+
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+
+    'loggers': {
+        # Django internals — warnings and above only
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # Your app — INFO and above (set to DEBUG locally if needed)
+        'employees': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+}

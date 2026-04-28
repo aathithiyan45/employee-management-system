@@ -9,6 +9,7 @@ from datetime import date, timedelta, datetime
 from django.contrib.auth import authenticate
 from django.db.models import Q, Count
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -35,7 +36,9 @@ from django.http import HttpResponse
 # ─────────────────────────────────────────────
 
 def safe_date(value):
-    """Parse any date value from Excel safely."""
+    """Parse any date value from Excel safely. Returns a date object (not datetime).
+    Use for DateField columns only (dob, doa, expiry dates, etc.).
+    For DateTimeField columns use safe_datetime() instead."""
     try:
         if value is None or value == "":
             return None
@@ -43,6 +46,24 @@ def safe_date(value):
             return None
         d = pd.to_datetime(value, errors="coerce", dayfirst=True)
         return d.date() if not pd.isna(d) else None
+    except Exception:
+        return None
+
+
+def safe_datetime(value):
+    """Parse any datetime value from Excel safely.
+    Returns a timezone-aware datetime (UTC) so Django never emits a
+    'received a naive datetime' RuntimeWarning for DateTimeField columns."""
+    try:
+        if value is None or value == "":
+            return None
+        if pd.isna(value):
+            return None
+        d = pd.to_datetime(value, errors="coerce", dayfirst=True)
+        if pd.isna(d):
+            return None
+        # Make timezone-aware in UTC — avoids RuntimeWarning when USE_TZ=True
+        return timezone.make_aware(d.to_pydatetime(), timezone.utc)
     except Exception:
         return None
 
@@ -386,7 +407,10 @@ def chart_monthly_growth(request):
     else:
         employees = Employee.objects.all()
 
-    twelve_months_ago = date.today() - timedelta(days=365)
+    # Use timezone.now() (aware datetime) not date.today() (naive date) when filtering
+    # a DateTimeField — passing a plain date causes Django to emit a RuntimeWarning.
+    now               = timezone.now()
+    twelve_months_ago = now - timedelta(days=365)
 
     monthly_data = (
         employees
@@ -399,8 +423,8 @@ def chart_monthly_growth(request):
 
     months  = []
     counts  = []
-    current = twelve_months_ago.replace(day=1)
-    end     = date.today().replace(day=1)
+    current = twelve_months_ago.date().replace(day=1)
+    end     = now.date().replace(day=1)
 
     month_dict = {item['month'].date(): item['count'] for item in monthly_data}
 
@@ -1257,7 +1281,8 @@ def leave_request_list(request):
                 qs = qs.filter(end_date__lte=to_date)
 
         paginator = PageNumberPagination()
-        paginator.page_size = int(request.GET.get('page_size', 20))
+        # Cap to 100 — prevents full-table dumps via ?page_size=999999
+        paginator.page_size = min(int(request.GET.get('page_size', 20)), 100)
         result_page = paginator.paginate_queryset(qs, request)
 
         data = [
@@ -1486,7 +1511,8 @@ def leave_audit_log(request):
             qs = qs.filter(action=action)
 
     paginator = PageNumberPagination()
-    paginator.page_size = int(request.GET.get('page_size', 30))
+    # Cap to 100 — prevents full-table dumps via ?page_size=999999
+    paginator.page_size = min(int(request.GET.get('page_size', 30)), 100)
     result_page = paginator.paginate_queryset(qs, request)
 
     data = [
