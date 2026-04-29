@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
+import Sidebar from "../components/Sidebar";
 import "./EmployeeDashboard.css";
 
 // ─────────────────────────────────────────────
@@ -165,15 +166,51 @@ function EmployeeDashboard() {
 
   const handleLogout = () => { localStorage.clear(); navigate("/"); };
 
-  // ── Loading ──
+  // ── Loading Skeleton ──
   if (loading) {
     return (
       <div className="dashboard-shell">
-        <aside className="sidebar" style={{ opacity: 0.4 }} />
+        <Sidebar />
         <div className="dashboard-main">
-          <div className="full-center">
-            <div className="loading-spinner" />
-            <span>Loading your dashboard…</span>
+          <div className="dashboard-topbar">
+            <div>
+              <div className="emp-skeleton" style={{ width:200, height:22, borderRadius:6, marginBottom:6 }} />
+              <div className="emp-skeleton" style={{ width:140, height:14, borderRadius:6 }} />
+            </div>
+            <div className="emp-skeleton" style={{ width:120, height:36, borderRadius:6 }} />
+          </div>
+          <div className="dashboard-content">
+            <div className="emp-skeleton" style={{ width:"100%", height:48, borderRadius:8 }} />
+            <div className="emp-stats-grid">
+              {[1,2,3].map(i => (
+                <div key={i} className="emp-stat-card">
+                  <div className="emp-skeleton" style={{ width:46, height:46, borderRadius:10 }} />
+                  <div style={{ flex:1 }}>
+                    <div className="emp-skeleton" style={{ width:"60%", height:26, borderRadius:6, marginBottom:8 }} />
+                    <div className="emp-skeleton" style={{ width:"80%", height:13, borderRadius:6 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="balance-grid">
+              {[1,2,3].map(i => (
+                <div key={i} className="emp-balance-card emp-balance-card--blue" style={{ padding:16 }}>
+                  <div className="emp-skeleton" style={{ width:"50%", height:13, borderRadius:6, marginBottom:10 }} />
+                  <div className="emp-skeleton" style={{ width:"35%", height:24, borderRadius:6, marginBottom:8 }} />
+                  <div className="emp-skeleton" style={{ width:"100%", height:5, borderRadius:99 }} />
+                </div>
+              ))}
+            </div>
+            <div style={{ background:"white", borderRadius:12, border:"1px solid var(--grey-200)", padding:20, boxShadow:"var(--shadow-sm)" }}>
+              {[1,2,3,4].map(i => (
+                <div key={i} style={{ display:"flex", gap:16, marginBottom:14 }}>
+                  <div className="emp-skeleton" style={{ flex:1, height:14, borderRadius:6 }} />
+                  <div className="emp-skeleton" style={{ flex:1, height:14, borderRadius:6 }} />
+                  <div className="emp-skeleton" style={{ flex:1, height:14, borderRadius:6 }} />
+                  <div className="emp-skeleton" style={{ width:70, height:22, borderRadius:20 }} />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -246,61 +283,7 @@ function EmployeeDashboard() {
         />
       )}
 
-      {/* ══ SIDEBAR — mirrors admin sidebar exactly ════════ */}
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-              stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </div>
-          <div>
-            <div className="sidebar-brand-name">HR Portal</div>
-            <div className="sidebar-brand-sub">Employee Dashboard</div>
-          </div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div className="sidebar-section-label">Main</div>
-
-          <button className="sidebar-link active">
-            <Icon d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" size={17} />
-            Dashboard
-          </button>
-
-          <button className="sidebar-link" onClick={() => setShowModal(true)}>
-            <Icon d="M3 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM16 2v4M8 2v4M3 10h18" size={17} />
-            Apply Leave
-          </button>
-
-          <button className="sidebar-link" onClick={() => navigate("/profile")}>
-            <Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={17} />
-            My Profile
-          </button>
-
-          <button className="sidebar-link" onClick={() => navigate("/change-password")}>
-            <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" size={17} />
-            Change Password
-          </button>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{initials}</div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user.name}</div>
-              <div className="sidebar-user-role">Employee</div>
-            </div>
-          </div>
-          <button className="sidebar-logout" onClick={handleLogout}>
-            <Icon d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" size={16} />
-            Sign Out
-          </button>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* ══ MAIN ══════════════════════════════════════════ */}
       <div className="dashboard-main">

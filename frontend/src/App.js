@@ -15,6 +15,7 @@ import LeaveBalance   from "./pages/LeaveBalance";
 import ChangePassword from "./pages/ChangePassword";
 
 import PrivateRoute from "./components/PrivateRoute";
+import NotFound    from "./pages/NotFound";
 
 import "./App.css";
 
@@ -71,7 +72,7 @@ function App() {
         } />
 
         {/* ── 404 catch-all — must be last ────────────────── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFound />} />
 
       </Routes>
     </BrowserRouter>

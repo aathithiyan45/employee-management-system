@@ -558,3 +558,30 @@
   .form-grid-2 { grid-template-columns: 1fr; }
   .balance-grid { grid-template-columns: 1fr; }
 }
+/* ── SKELETON LOADER ─────────────────────────────────────── */
+.emp-skeleton {
+  background: linear-gradient(90deg, var(--grey-200) 25%, var(--grey-100) 50%, var(--grey-200) 75%);
+  background-size: 200% 100%;
+  animation: empShimmer 1.4s infinite;
+  display: block;
+}
+
+@keyframes empShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Skeleton Loader ─────────────────────────────────────── */
+.sk {
+  background: linear-gradient(90deg, #e2e6ea 25%, #f0f2f5 50%, #e2e6ea 75%);
+  background-size: 200% 100%;
+  animation: skShimmer 1.4s ease infinite;
+  display: block;
+}
+.sk-line { border-radius: 6px; width: 100%; }
+.sk-box  { border-radius: 8px; flex-shrink: 0; }
+
+@keyframes skShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
