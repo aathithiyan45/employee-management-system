@@ -41,6 +41,13 @@ from .views import (
 
     # Leave — Audit
     leave_audit_log,
+
+    # Documents
+    document_list_upload,
+    document_delete,
+    document_download,
+    documents_expiring,
+    document_audit_log,
 )
 
 urlpatterns = [
@@ -85,4 +92,11 @@ urlpatterns = [
 
     # ── Leave — Audit Log ───────────────────────
     path('leave/audit/',                       leave_audit_log),
+
+    # ── Documents ───────────────────────────────
+    path('documents/audit/',            document_audit_log),
+    path('documents/expiring/',         documents_expiring),
+    path('documents/<str:emp_id>/',      document_list_upload),
+    path('documents/<int:pk>/delete/',   document_delete),
+    path('documents/<int:pk>/download/', document_download),
 ]

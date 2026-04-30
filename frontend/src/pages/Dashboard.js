@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api, { logout } from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
+import Sidebar from "../components/Sidebar";
 import {
   Chart as ChartJS,
   ArcElement,
@@ -59,10 +60,8 @@ function Toast({ message, type, onClose }) {
 }
 
 function Dashboard() {
-  // ── user from localStorage — backend returns `username` ──
+  // ── user from localStorage ───────────────────────────────
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  // username may be a single word — just take first 2 chars
-  const initials = (user?.username || "A").slice(0, 2).toUpperCase();
 
   const [data, setData] = useState({
     total_employees:     0,
@@ -233,8 +232,8 @@ function Dashboard() {
     }
   };
 
-  // logout() calls POST /api/logout/ to blacklist the refresh token on the
-  // server before clearing localStorage — prevents token replay after sign-out.
+  // ── Logout — clear all local storage keys ────────────────
+  // logout() blacklists refresh token server-side before clearing localStorage
   const handleLogout = () => logout();
 
   // ── Stat card click → navigate to employees with filters ─
@@ -308,83 +307,8 @@ function Dashboard() {
         />
       )}
 
-      {/* ══ SIDEBAR ══════════════════════════════════════ */}
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-              stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          </div>
-          <div className="sidebar-brand-name">HR Portal</div>
-          <div className="sidebar-brand-sub">Admin Dashboard</div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div className="sidebar-section-label">Main</div>
-          <button className="sidebar-link active">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-            </svg>
-            Dashboard
-          </button>
-          <button className="sidebar-link" onClick={() => navigate("/employees")}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            Employees
-          </button>
-          <button className="sidebar-link" onClick={() => navigate("/import")}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-            </svg>
-            Import Data
-          </button>
-          <button className="sidebar-link" onClick={() => navigate("/leave")}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            Leave Management
-          </button>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{initials}</div>
-            <div className="sidebar-user-info">
-              {/* backend returns username, not name */}
-              <div className="sidebar-user-name">{user?.username || "Admin"}</div>
-              <div className="sidebar-user-role">
-                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : "Administrator"}
-              </div>
-            </div>
-          </div>
-          <button className="sidebar-logout" onClick={handleLogout}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
-            </svg>
-            Sign Out
-          </button>
-        </div>
-      </aside>
+      {/* ══ SIDEBAR — shared component (handles nav, user footer, logout) ══ */}
+      <Sidebar />
 
       {/* ══ MAIN ═════════════════════════════════════════ */}
       <div className="dashboard-main">
@@ -440,6 +364,14 @@ function Dashboard() {
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
               {exportLoading ? "Exporting…" : "Export CSV"}
+            </button>
+
+            <button className="topbar-btn" onClick={() => navigate("/documents")}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h4"/>
+              </svg>
+              Documents
             </button>
 
             <button className="topbar-btn primary" onClick={() => navigate("/employees")}>

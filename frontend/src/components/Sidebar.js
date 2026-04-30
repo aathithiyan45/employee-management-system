@@ -18,6 +18,7 @@ const ADMIN_NAV = [
       { path: "/employees", label: "Employees",       icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
       { path: "/import",    label: "Import Data",     icon: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" },
       { path: "/leave",     label: "Leave Management",icon: "M3 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM16 2v4M8 2v4M3 10h18" },
+      { path: "/documents", label: "Documents",       icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h4" },
     ],
   },
 ];
@@ -28,6 +29,7 @@ const HR_NAV = [
     links: [
       { path: "/hr/dashboard", label: "HR Dashboard",    icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
       { path: "/leave",        label: "Leave Approvals", icon: "M3 4h18a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM16 2v4M8 2v4M3 10h18" },
+      { path: "/documents",    label: "Documents",       icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h4" },
       { path: "/employees",    label: "Employees",       icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
     ],
   },
@@ -37,8 +39,9 @@ const EMPLOYEE_NAV = [
   {
     label: "Main",
     links: [
-      { path: "/employee/dashboard", label: "Dashboard", icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
-      { path: "/profile",            label: "My Profile", icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" },
+      { path: "/employee/dashboard", label: "Dashboard",    icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
+      { path: "/profile",            label: "My Profile",   icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" },
+      { path: "/documents",          label: "My Documents", icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h4" },
     ],
   },
 ];
@@ -56,8 +59,6 @@ function Sidebar() {
   const sections  = NAV_BY_ROLE[role] || EMPLOYEE_NAV;
   const subtitle  = SUBTITLE_BY_ROLE[role] || "Portal";
 
-  // logout() calls POST /api/logout/ to blacklist the refresh token on the
-  // server before clearing localStorage — prevents token replay after sign-out.
   const handleLogout = () => logout();
 
   return (

@@ -13,9 +13,8 @@ import ImportEmployees from "./pages/Importemployees";
 import LeaveManagement from "./pages/LeaveManagement";
 import LeaveBalance   from "./pages/LeaveBalance";
 import ChangePassword from "./pages/ChangePassword";
-
-import PrivateRoute from "./components/PrivateRoute";
-import NotFound    from "./pages/NotFound";
+import Documents     from "./pages/Documents";
+import PrivateRoute   from "./components/PrivateRoute";
 
 import "./App.css";
 
@@ -70,9 +69,12 @@ function App() {
         <Route path="/change-password" element={
           <PrivateRoute requiredRole="any"><ChangePassword /></PrivateRoute>
         } />
+        <Route path="/documents" element={
+          <PrivateRoute requiredRole="any"><Documents /></PrivateRoute>
+        } />
 
         {/* ── 404 catch-all — must be last ────────────────── */}
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
 
       </Routes>
     </BrowserRouter>

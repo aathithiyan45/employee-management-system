@@ -1,6 +1,21 @@
 from django.contrib import admin
-from .models import User, Employee, Division
+from .models import User, Employee, Division, EmployeeDocument
 
+# Basic registrations
 admin.site.register(User)
 admin.site.register(Employee)
 admin.site.register(Division)
+
+# Document admin
+@admin.register(EmployeeDocument)
+class EmployeeDocumentAdmin(admin.ModelAdmin):
+    list_display = (
+        'employee',
+        'doc_type',      # ✅ correct field
+        'label',         # ✅ correct field
+        'expiry_date',
+        'uploaded_at'
+    )
+    list_filter = ('doc_type',)  # ✅ correct
+    search_fields = ('employee__emp_id', 'employee__name', 'label')
+    readonly_fields = ('uploaded_at',)
