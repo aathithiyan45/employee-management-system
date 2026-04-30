@@ -38,7 +38,11 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',  # required for BLACKLIST_AFTER_ROTATION
-    'employees',
+    'apps.employees',
+    'apps.accounts',
+    'apps.leave',
+    'apps.documents',
+    'apps.analytics',
 ]
 
 
@@ -54,7 +58,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    # 'django.middleware.clickjacking.XFrameOptionsMiddleware', # Commented out to allow PDF previews in an iframe on port 3000
+    'django.middleware.clickjacking.XFrameOptionsMiddleware', # Commented out to allow PDF previews in an iframe on port 3000
 ]
 
 
@@ -219,7 +223,7 @@ LOGGING = {
             'propagate': False,
         },
         # Your app — INFO and above (set to DEBUG locally if needed)
-        'employees': {
+        'apps.employees': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

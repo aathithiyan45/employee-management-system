@@ -1,7 +1,8 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-from .models import Employee, LeaveBalance
+from .models import Employee
+from apps.leave.models import LeaveBalance
 
 @receiver(post_save, sender=Employee)
 def create_employee_leave_balance(sender, instance, created, **kwargs):
