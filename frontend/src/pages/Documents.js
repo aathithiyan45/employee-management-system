@@ -30,7 +30,8 @@ const DOC_META = {
 function PreviewModal({ doc, onClose }) {
   const isPdf = doc.file_name?.toLowerCase().endsWith('.pdf');
   const isImg = /\.(jpg|jpeg|png)$/i.test(doc.file_name || '');
-  const previewUrl = `http://127.0.0.1:8000/media/${doc.file_path || ''}`;
+  const host = window.location.hostname;
+  const previewUrl = `http://${host}:8000/media/${doc.file_path || ''}`;
 
   return (
     <div className="doc-modal-overlay" onClick={onClose}>

@@ -54,7 +54,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 'django.middleware.clickjacking.XFrameOptionsMiddleware', # Commented out to allow PDF previews in an iframe on port 3000
 ]
 
 
@@ -212,10 +212,10 @@ LOGGING = {
     },
 
     'loggers': {
-        # Django internals — warnings and above only
+        # Django internals — INFO and above to show request logs in terminal
         'django': {
             'handlers': ['console'],
-            'level': 'WARNING',
+            'level': 'INFO',
             'propagate': False,
         },
         # Your app — INFO and above (set to DEBUG locally if needed)
