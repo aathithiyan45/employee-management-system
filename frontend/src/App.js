@@ -13,6 +13,7 @@ import ImportEmployees from "./pages/Importemployees";
 import LeaveManagement from "./pages/LeaveManagement";
 import LeaveBalance   from "./pages/LeaveBalance";
 import ChangePassword from "./pages/ChangePassword";
+import SetPassword    from "./pages/SetPassword";
 import Documents     from "./pages/Documents";
 import PrivateRoute   from "./components/PrivateRoute";
 
@@ -25,6 +26,7 @@ function App() {
 
         {/* ── Public ─────────────────────────────────────── */}
         <Route path="/" element={<Login />} />
+        <Route path="/set-password/:uid/:token" element={<SetPassword />} />
 
         {/* ── Admin only ──────────────────────────────────── */}
         <Route path="/dashboard" element={

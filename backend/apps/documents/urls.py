@@ -5,6 +5,7 @@ from .views import (
     document_list_upload,
     document_delete,
     document_download,
+    document_preview,
 )
 
 urlpatterns = [
@@ -13,4 +14,5 @@ urlpatterns = [
     path('<str:emp_id>/',      document_list_upload),
     path('<int:pk>/delete/',   document_delete),
     path('<int:pk>/download/', document_download),
+    path('<int:pk>/preview/',  document_preview),
 ]

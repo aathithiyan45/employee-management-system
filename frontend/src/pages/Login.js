@@ -39,7 +39,7 @@ function Login() {
     }
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/login/`, { username, password });
+      const res = await axios.post(`${API_BASE}/login/`, { username, password }, { withCredentials: true });
       const data = res.data;
 
       // Validate the selected role matches the server-side role
@@ -51,7 +51,6 @@ function Login() {
       // Persist session
       localStorage.setItem("user",    JSON.stringify(data));
       localStorage.setItem("access",  data.access);
-      localStorage.setItem("refresh", data.refresh);
 
       // Force password change on first login
       if (data.must_change_password) {

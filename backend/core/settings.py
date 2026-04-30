@@ -58,8 +58,25 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware', # Commented out to allow PDF previews in an iframe on port 3000
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.CSPMiddleware',
 ]
+
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_TRUSTED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000').split(',')
+
+# ─────────────────────────────────────────────
+# SECURITY - CLICKJACKING & CSP
+# ─────────────────────────────────────────────
+# X_FRAME_OPTIONS = 'DENY' is the most secure, but 'SAMEORIGIN' is often needed.
+# For cross-origin iframes (like React on 3000), frame-ancestors in CSP is the modern way.
+X_FRAME_OPTIONS = 'DENY'
+
 
 
 # ─────────────────────────────────────────────
@@ -72,6 +89,7 @@ CORS_ALLOWED_ORIGINS = config(
     default='http://localhost:3000,http://127.0.0.1:3000',
     cast=Csv()
 )
+CORS_ALLOW_CREDENTIALS = True
 
 
 # ─────────────────────────────────────────────
@@ -117,10 +135,21 @@ DATABASES = {
 # ─────────────────────────────────────────────
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
-    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 10}},
     {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
+
+# ─────────────────────────────────────────────
+# EMAIL CONFIGURATION (SMTP)
+# ─────────────────────────────────────────────
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@yourcompany.com')
 
 
 # ─────────────────────────────────────────────
@@ -155,7 +184,7 @@ AUTH_USER_MODEL = 'employees.User'
 # ─────────────────────────────────────────────
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.accounts.auth.VersionedJWTAuthentication',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 15,
@@ -164,8 +193,8 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '60/minute',
-        'user': '300/minute',
+        'anon': '100/day',
+        'user': '1000/day',
         'login': '10/minute',   # custom scope used on the login view
     },
 }
@@ -175,7 +204,7 @@ REST_FRAMEWORK = {
 # JWT — loaded from .env
 # ─────────────────────────────────────────────
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME':  timedelta(hours=config('JWT_ACCESS_TOKEN_HOURS', default=8,  cast=int)),
+    'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=config('JWT_ACCESS_TOKEN_MINUTES', default=15, cast=int)),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=config('JWT_REFRESH_TOKEN_DAYS',  default=1,  cast=int)),
     'ROTATE_REFRESH_TOKENS':       True,
     'BLACKLIST_AFTER_ROTATION':    True,   # old refresh tokens are invalidated after use
@@ -230,8 +259,19 @@ LOGGING = {
         },
     },
 
-    'root': {
+        'root': {
         'handlers': ['console'],
         'level': 'WARNING',
     },
 }
+
+# ─────────────────────────────────────────────
+# SECURITY - HTTPS ENFORCEMENT
+# ─────────────────────────────────────────────
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_CONTENT_TYPE_OPTIONS = 'nosniff'

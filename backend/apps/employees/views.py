@@ -314,14 +314,7 @@ def validate_upload(file, allowed_extensions, allowed_magic, max_bytes):
 @permission_classes([IsAuthenticated])
 def import_excel(request):
     """
-    Single Excel upload.
-    IS_ACTIVE column: 1 = active (current), 0 = inactive (cancelled).
-    If IS_ACTIVE column is missing → defaults to True (active).
-    EMP ID is the only required column. All others are optional.
-
-    NEW EMPLOYEES → auto-creates User account with temp password.
-    Returns credentials Excel file if any new employees were created.
-    Existing employees → updated only, no password change.
+    Production-grade Excel import with strict validation and partial success.
     """
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "Admin or HR access only"}, status=403)
@@ -330,7 +323,8 @@ def import_excel(request):
     if not file:
         return Response({"error": "No file uploaded"}, status=400)
 
-    # Validate size, extension, and magic bytes before Pandas touches the file
+    # 1. Security & File Validation
+    from .views import validate_upload, EXCEL_EXTENSIONS, EXCEL_MAGIC, EXCEL_MAX_BYTES
     ok, err = validate_upload(
         file,
         allowed_extensions=EXCEL_EXTENSIONS,
@@ -340,195 +334,28 @@ def import_excel(request):
     if not ok:
         return Response({"error": err}, status=400)
 
-    try:
-        df = pd.read_excel(file, sheet_name=0, dtype=str)
-    except Exception as e:
-        return Response({"error": f"Excel read failed — {e}"}, status=400)
+    # 2. Run Pipeline
+    from .import_pipeline import EmployeeImportPipeline
+    pipeline = EmployeeImportPipeline(file, request.user)
+    success, result = pipeline.run()
 
-    # Normalise column names
-    df.columns = df.columns.str.strip()
-    df = df.where(pd.notnull(df), None)
+    if not success:
+        return Response({"error": result}, status=400)
 
-    created          = 0
-    updated          = 0
-    skipped          = 0
-    errors           = []
-    new_credentials  = []   # [{emp_id, name, temp_password}]
-
-    for idx, row in df.iterrows():
-        row = row.to_dict()
-
-        # ── EMP ID (required) ──────────────────────────
-        emp_id = safe_get(row, "EMP ID")
-        if not emp_id:
-            skipped += 1
-            continue
-
-        # ── IS_ACTIVE ──────────────────────────────────
-        raw_active = row.get("IS_ACTIVE")
-        if raw_active is None or str(raw_active).strip() == "":
-            is_active = True
-        else:
-            is_active = safe_bool(raw_active)
-
-        # ── DIVISION ───────────────────────────────────
-        company  = safe_get(row, "COMPANY").strip().upper() or "UNKNOWN"
-        division, _ = Division.objects.get_or_create(name=company)
-
-        emp_name = safe_get(row, "NAME") or f"EMP-{emp_id}"
-
-        # ── Build defaults dict ────────────────────────
-        defaults = {
-            # Basic
-            "name":          emp_name,
-            "phone":         safe_get(row, "HP NUMBER") or None,
-            "nationality":   safe_get(row, "NATIONALITY") or None,
-            "dob":           safe_date(row.get("D.O.B")),
-            "qualification": safe_get(row, "QUALIFICATION") or None,
-            "division":      division,
-            "is_active":     is_active,
-
-            # Job / Salary
-            "designation_ipa": safe_get(row, "IPA DESIGNATION") or None,
-            "designation_aug": safe_get(row, "Trade") or None,
-            "ipa_salary":      safe_float(row.get("IPA SALARY")),
-            "per_hr":          safe_float(row.get("PER HR")),
-            "salary":          safe_float(row.get("IPA SALARY")),
-
-            # Employment Dates
-            "doa":                 safe_date(row.get("DOA")),
-            "arrival_date":        safe_date(row.get("ARRIVAL DATE")),
-            "date_joined_company": safe_date(row.get("DATE JOINED")),
-
-            # Work Permit / IC
-            "work_permit_no": safe_get(row, "IC / WP NO") or None,
-            "fin_no":         safe_get(row, "FIN NO") or None,
-            "ic_status":      safe_get(row, "IC TYPE") or None,
-            "issue_date":     safe_date(row.get("ISSUANCE DATE")),
-            "wp_expiry":      safe_date(row.get("S PASS/ WP EXPRIY")),
-
-            # Passport
-            "passport_no":     safe_get(row, "PP.NO") or None,
-            "passport_expiry": safe_date(row.get("PP EXPIRY")),
-
-            # Certifications / Safety
-            "ssic_gt_sn":  safe_get(row, "SSIC GT S/N") or None,
-            "ssic_gt_exp": safe_date(row.get("SSIC GT EXP DATE")),
-            "ssic_ht_sn":  safe_get(row, "SSIC HT S/N") or None,
-            "ssic_ht_exp": safe_date(row.get("SSIC HT EXP DATE")),
-
-            "work_at_height":   safe_bool(row.get("WORK-AT-HEIGHT")),
-            "confined_space":   safe_bool(row.get("CONFINED SPACE")),
-            "signalman_rigger": safe_bool(row.get("SIGNALMAN & RIGGER COURSE")),
-            "welder_no":        safe_get(row, "WELDER NO") or None,
-            "lssc_sn":          safe_get(row, "LSSC S/N") or None,
-
-            # Finance / Other
-            "bank_account":  safe_get(row, "BANK ACCOUNT NUMBER") or None,
-            "accommodation": safe_get(row, "ACCOMODATION") or None,
-            "pcp_status":    safe_get(row, "PCP STATUS") or None,
-            "remarks":       safe_get(row, "REMARKS") or None,
-        }
-
-        try:
-            employee, created_flag = Employee.objects.update_or_create(
-                emp_id=emp_id,
-                defaults=defaults,
-            )
-
-            if created_flag:
-                created += 1
-
-                # ── Auto-create User for NEW employees only ──
-                temp_password = generate_password()
-
-                user_obj, _ = User.objects.get_or_create(
-                    username=emp_id,
-                    defaults={"role": "employee"}
-                )
-                user_obj.set_password(temp_password)
-                user_obj.must_change_password = True
-                user_obj.save()
-
-                # Link user ↔ employee
-                employee.user = user_obj
-                employee.save(update_fields=["user"])
-
-                new_credentials.append({
-                    "emp_id":         emp_id,
-                    "name":           emp_name,
-                    "temp_password":  temp_password,
-                })
-
-            else:
-                updated += 1
-
-        except Exception as e:
-            errors.append({
-                "row":    idx + 2,
-                "emp_id": emp_id,
-                "error":  str(e),
-            })
-            skipped += 1
-            continue
-
-    # ── If new employees exist → return credentials Excel ──────────
-    if new_credentials:
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Credentials"
-
-        # Header row
-        header_fill  = openpyxl.styles.PatternFill("solid", fgColor="1565C0")
-        header_font  = openpyxl.styles.Font(bold=True, color="FFFFFF")
-        headers = ["EMP ID", "NAME", "TEMP PASSWORD", "NOTE"]
-        for col, h in enumerate(headers, 1):
-            cell = ws.cell(row=1, column=col, value=h)
-            cell.font = header_font
-            cell.fill = header_fill
-
-        # Data rows
-        for i, cred in enumerate(new_credentials, 2):
-            ws.cell(row=i, column=1, value=cred["emp_id"])
-            ws.cell(row=i, column=2, value=cred["name"])
-            ws.cell(row=i, column=3, value=cred["temp_password"])
-            ws.cell(row=i, column=4, value="Employee must change password on first login")
-
-        # Column widths
-        ws.column_dimensions["A"].width = 15
-        ws.column_dimensions["B"].width = 30
-        ws.column_dimensions["C"].width = 20
-        ws.column_dimensions["D"].width = 52
-
-        buffer = io.BytesIO()
-        wb.save(buffer)
-        buffer.seek(0)
-
-        response = HttpResponse(
-            buffer,
-            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        response["Content-Disposition"] = 'attachment; filename="employee_credentials.xlsx"'
-        response["X-Import-Created"]    = str(created)
-        response["X-Import-Updated"]    = str(updated)
-        response["X-Import-Skipped"]    = str(skipped)
-        response["X-Import-Total"]      = str(created + updated + skipped)
-        response["Access-Control-Expose-Headers"] = (
-            "X-Import-Created, X-Import-Updated, X-Import-Skipped, "
-            "X-Import-Total, Content-Disposition"
-        )
-        return response
-
-    # ── No new employees → normal JSON response ────────────────────
+    # 3. Handle Response
     response_data = {
-        "message":    "Import completed",
-        "created":    created,
-        "updated":    updated,
-        "skipped":    skipped,
-        "total_rows": created + updated + skipped,
+        "message": "Import completed",
+        "summary": {
+            "total": result["total"],
+            "success": result["success"],
+            "failed": result["failed"]
+        },
+        "errors": result["errors"][:50], # Limit to first 50 JSON errors
     }
-    if errors:
-        response_data["errors"] = errors[:20]
+
+    if result["failed"] > 0:
+        response_data["error_report_available"] = True
+        response_data["message"] = f"Import completed with {result['failed']} errors. Download the error report for details."
 
     return Response(response_data)
 
@@ -753,48 +580,50 @@ def export_employees(request):
     if division and division != "all":
         qs = qs.filter(division__name=division)
 
-    data = [
-        {
-            "EMP ID":            e.emp_id,
-            "IS_ACTIVE":         1 if e.is_active else 0,
-            "NAME":              e.name,
-            "HP NUMBER":         e.phone,
-            "NATIONALITY":       e.nationality,
-            "D.O.B":             e.dob,
-            "COMPANY":           e.division.name,
-            "IPA DESIGNATION":   e.designation_ipa,
-            "Trade":             e.designation_aug,
-            "IPA SALARY":        e.ipa_salary,
-            "PER HR":            e.per_hr,
-            "DOA":               e.doa,
-            "ARRIVAL DATE":      e.arrival_date,
-            "DATE JOINED":       e.date_joined_company,
-            "EXPERIENCE YEARS":  e.experience_years,
-            "IC / WP NO":        e.work_permit_no,
-            "FIN NO":            e.fin_no,
-            "IC TYPE":           e.ic_status,
-            "ISSUANCE DATE":     e.issue_date,
-            "S PASS/ WP EXPRIY": e.wp_expiry,
-            "PP.NO":             e.passport_no,
-            "PP EXPIRY":         e.passport_expiry,
-            "SSIC GT S/N":       e.ssic_gt_sn,
-            "SSIC GT EXP DATE":  e.ssic_gt_exp,
-            "SSIC HT S/N":       e.ssic_ht_sn,
-            "SSIC HT EXP DATE":  e.ssic_ht_exp,
-            "WORK-AT-HEIGHT":    1 if e.work_at_height else 0,
-            "CONFINED SPACE":    1 if e.confined_space else 0,
-            "WELDER NO":         e.welder_no,
-            "LSSC S/N":          e.lssc_sn,
-            "SIGNALMAN & RIGGER COURSE": 1 if e.signalman_rigger else 0,
-            "BANK ACCOUNT NUMBER": e.bank_account,
-            "ACCOMODATION":      e.accommodation,
-            "PCP STATUS":        e.pcp_status,
-            "REMARKS":           e.remarks,
-        }
-        for e in qs
-    ]
+    def employee_generator(queryset):
+        for e in queryset.iterator(chunk_size=500):
+            yield {
+                "EMP ID":            e.emp_id,
+                "IS_ACTIVE":         1 if e.is_active else 0,
+                "NAME":              e.name,
+                "HP NUMBER":         e.phone,
+                "NATIONALITY":       e.nationality,
+                "D.O.B":             e.dob,
+                "COMPANY":           e.division.name,
+                "IPA DESIGNATION":   e.designation_ipa,
+                "Trade":             e.designation_aug,
+                "IPA SALARY":        e.ipa_salary,
+                "PER HR":            e.per_hr,
+                "DOA":               e.doa,
+                "ARRIVAL DATE":      e.arrival_date,
+                "DATE JOINED":       e.date_joined_company,
+                "EXPERIENCE YEARS":  e.experience_years,
+                "IC / WP NO":        e.work_permit_no,
+                "FIN NO":            e.fin_no,
+                "IC TYPE":           e.ic_status,
+                "ISSUANCE DATE":     e.issue_date,
+                "S PASS/ WP EXPRIY": e.wp_expiry,
+                "PP.NO":             e.passport_no,
+                "PP EXPIRY":         e.passport_expiry,
+                "SSIC GT S/N":       e.ssic_gt_sn,
+                "SSIC GT EXP DATE":  e.ssic_gt_exp,
+                "SSIC HT S/N":       e.ssic_ht_sn,
+                "SSIC HT EXP DATE":  e.ssic_ht_exp,
+                "WORK-AT-HEIGHT":    1 if e.work_at_height else 0,
+                "CONFINED SPACE":    1 if e.confined_space else 0,
+                "WELDER NO":         e.welder_no,
+                "LSSC S/N":          e.lssc_sn,
+                "SIGNALMAN & RIGGER COURSE": 1 if e.signalman_rigger else 0,
+                "BANK ACCOUNT NUMBER": e.bank_account,
+                "ACCOMODATION":      e.accommodation,
+                "PCP STATUS":        e.pcp_status,
+                "REMARKS":           e.remarks,
+            }
 
-    return Response(data)
+    # Since we are returning a list in JSON for the frontend, we still iterate here.
+    # To truly stream, we'd need StreamingHttpResponse + JSON lines or CSV.
+    # However, using iterator() at least avoids the massive queryset cache in memory.
+    return Response(list(employee_generator(qs)))
 
 
 # ─────────────────────────────────────────────

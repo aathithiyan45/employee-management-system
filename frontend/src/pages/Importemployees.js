@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../axiosInstance";
+import api, { logout } from "../axiosInstance";
 import "./Importemployees.css";
 
 // ── Icons ─────────────────────────────────────────────────
@@ -17,6 +17,7 @@ const ALL_COLS = [
   { col: "IS_ACTIVE",                 required: false, note: "1=Active, 0=Inactive (defaults to 1)" },
   { col: "COMPANY",                   required: false },
   { col: "NAME",                      required: false },
+  { col: "EMAIL",                     required: true,  note: "Required for invitation email" },
   { col: "HP NUMBER",                 required: false },
   { col: "NATIONALITY",               required: false },
   { col: "D.O.B",                     required: false },
@@ -90,58 +91,14 @@ function UploadPanel({ onSuccess }) {
     try {
       const res = await api.post("import/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
-        responseType: "arraybuffer", // handle both Excel + JSON responses
       });
 
-      const contentType = res.headers["content-type"] || "";
-
-      // ── Backend returned credentials Excel (new employees created) ──
-      if (
-        contentType.includes("spreadsheetml") ||
-        contentType.includes("excel")
-      ) {
-        const created = parseInt(res.headers["x-import-created"] || "0");
-        const updated = parseInt(res.headers["x-import-updated"] || "0");
-        const skipped = parseInt(res.headers["x-import-skipped"] || "0");
-        const total   = parseInt(res.headers["x-import-total"]   || "0");
-
-        // Trigger browser download of credentials Excel
-        const blob = new Blob([res.data], {
-          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        });
-        const url  = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href  = url;
-        link.download = "employee_credentials.xlsx";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-        setResult({ created, updated, skipped, total_rows: total, hasCredentials: true });
-        setStatus("success");
-        if (onSuccess) onSuccess();
-
-      } else {
-        // ── Normal JSON response (no new employees, only updates) ──
-        const text = new TextDecoder().decode(res.data);
-        const data = JSON.parse(text);
-        setResult(data);
-        setStatus("success");
-        if (onSuccess) onSuccess();
-      }
+      setResult(res.data);
+      setStatus("success");
+      if (onSuccess) onSuccess();
 
     } catch (err) {
-      // arraybuffer error — decode it
-      let msg = "Upload failed. Check file format and try again.";
-      if (err.response?.data) {
-        try {
-          const text   = new TextDecoder().decode(err.response.data);
-          const parsed = JSON.parse(text);
-          msg = parsed.error || msg;
-        } catch (_) {}
-      }
-      setErrorMsg(msg);
+      setErrorMsg(err.response?.data?.error || "Upload failed. Check file format and try again.");
       setStatus("error");
     }
   };
@@ -192,17 +149,27 @@ function UploadPanel({ onSuccess }) {
         </span>
       </div>
 
-      {/* Password info banner */}
-      <div className="active-info-banner" style={{ background: "#eff6ff", borderColor: "#bfdbfe", color: "#1d4ed8" }}>
+      {/* Email Requirement Box */}
+      <div className="active-info-banner" style={{ background: "#f0f9ff", borderColor: "#bae6fd", color: "#0369a1" }}>
+        <Icon
+          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+          size={15}
+          stroke="#0369a1"
+        />
+        <span>
+          <strong>Email Invitation:</strong> New employees will receive an <strong>email invitation</strong> to set their password securely. No passwords are generated or stored by the system. <strong>EMAIL</strong> is required for all new entries.
+        </span>
+      </div>
+
+      {/* Security Info Box */}
+      <div className="active-info-banner" style={{ background: "#fdf2f8", borderColor: "#fbcfe8", color: "#9d174d" }}>
         <Icon
           d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
           size={15}
-          stroke="#1d4ed8"
+          stroke="#9d174d"
         />
         <span>
-          <strong>New employees:</strong> A temp password is auto-generated and a{" "}
-          <strong>credentials Excel</strong> will be downloaded automatically after import.
-          Employees must change their password on first login.
+          <strong>Security:</strong> Employees set their own password using a secure, time-limited link. This ensures maximum privacy and compliance.
         </span>
       </div>
 
@@ -337,20 +304,17 @@ function UploadPanel({ onSuccess }) {
             </div>
           </div>
 
-          {/* 🔐 Credentials downloaded banner */}
-          {result.hasCredentials && (
-            <div className="credentials-banner">
-              <Icon
-                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8"
-                size={18}
-                stroke="#15803d"
-              />
-              <span>
-                <strong>Credentials Excel downloaded!</strong> Share temp passwords with
-                new employees. They must change their password on first login.
-              </span>
-            </div>
-          )}
+          {/* Onboarding success banner */}
+          <div className="credentials-banner">
+            <Icon
+              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              size={18}
+              stroke="#15803d"
+            />
+            <span>
+              <strong>Employees Invited!</strong> Onboarding emails have been sent to new employees. Ask them to check their inbox to complete setup.
+            </span>
+          </div>
 
           {/* Row-level errors from backend */}
           {result.errors && result.errors.length > 0 && (
@@ -410,11 +374,9 @@ function ImportEmployees() {
   const navigate  = useNavigate();
   const user      = JSON.parse(localStorage.getItem("user") || "{}");
   const initials  = (user?.username || "A").slice(0, 2).toUpperCase();
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleLogout = () => {
-    localStorage.clear();
-    navigate("/");
+    logout();
   };
 
   return (
@@ -510,13 +472,13 @@ function ImportEmployees() {
               <strong>IS_ACTIVE</strong> column to mark active (<code>1</code>) or
               inactive (<code>0</code>) employees. Existing records are{" "}
               <strong>updated</strong> by EMP ID — never duplicated.{" "}
-              <strong>New employees</strong> get an auto-generated temp password
-              delivered via downloaded Excel.
+              <strong>New employees</strong> receive an email invitation to set their
+              password securely.
             </p>
           </div>
 
           <div className="import-single">
-            <UploadPanel onSuccess={() => setRefreshKey((k) => k + 1)} />
+            <UploadPanel />
           </div>
 
           {/* Info notes */}
@@ -554,9 +516,8 @@ function ImportEmployees() {
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
               <span>
-                <strong>New employees</strong> automatically get a login account.
-                Temp passwords are in the downloaded <strong>employee_credentials.xlsx</strong>.
-                Employees must change password on first login.
+                <strong>Security:</strong> Employees set their own password using a
+                secure, time-limited link. No passwords are ever stored in Excel files.
               </span>
             </div>
             <div className="import-note">

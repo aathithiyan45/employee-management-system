@@ -2,6 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "http://127.0.0.1:8000/api/",
+  withCredentials: true,
 });
 
 // Attach JWT token to every request
@@ -18,18 +19,20 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && !original._retry && !original.url.includes('token/refresh')) {
       original._retry = true;
       try {
+        // We no longer send the refresh token in the body; it's in the httpOnly cookie.
+        // We must use withCredentials: true (set globally above) so the browser sends it.
+        const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {}, { withCredentials: true });
+        
         const user = JSON.parse(localStorage.getItem("user") || "null");
-        const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {
-          refresh: user.refresh,
-        });
         user.access = res.data.access;
         localStorage.setItem("user", JSON.stringify(user));
+        
         original.headers.Authorization = `Bearer ${res.data.access}`;
         return api(original);
-      } catch {
+      } catch (err) {
         localStorage.clear();
         window.location.href = "/";
       }
@@ -48,13 +51,10 @@ api.interceptors.response.use(
  *   <button onClick={logout}>Sign out</button>
  */
 export async function logout() {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-  if (user?.refresh) {
-    try {
-      await api.post("logout/", { refresh: user.refresh });
-    } catch {
-      // If the server call fails (token already expired etc.) still clear local state
-    }
+  try {
+    await api.post("logout/");
+  } catch {
+    //
   }
   localStorage.clear();
   window.location.href = "/";

@@ -28,10 +28,27 @@ const DOC_META = {
 
 // ── Preview Modal ───────────────────────────────────────────
 function PreviewModal({ doc, onClose }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
   const isPdf = doc.file_name?.toLowerCase().endsWith('.pdf');
   const isImg = /\.(jpg|jpeg|png)$/i.test(doc.file_name || '');
-  const host = window.location.hostname;
-  const previewUrl = `http://${host}:8000/media/${doc.file_path || ''}`;
+
+  useEffect(() => {
+    let url = null;
+    const fetchFile = async () => {
+      try {
+        const res = await api.get(`/documents/${doc.id}/preview/`, { responseType: 'blob' });
+        url = URL.createObjectURL(new Blob([res.data]));
+        setBlobUrl(url);
+      } catch (err) {
+        console.error("Preview failed", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchFile();
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [doc.id]);
 
   return (
     <div className="doc-modal-overlay" onClick={onClose}>
@@ -46,21 +63,21 @@ function PreviewModal({ doc, onClose }) {
           </button>
         </div>
         <div className="doc-preview-body">
-          {isPdf && (
-            <iframe
-              src={previewUrl}
-              title={doc.label}
-              className="doc-preview-iframe"
-            />
-          )}
-          {isImg && (
-            <img src={previewUrl} alt={doc.label} className="doc-preview-img" />
-          )}
-          {!isPdf && !isImg && (
-            <div className="doc-empty">
-              <Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" size={40} stroke="#9aa5b4" />
-              <p>Preview not available for this file type.</p>
-            </div>
+          {loading ? (
+            <div className="doc-empty"><div className="doc-spin" /><p>Loading preview…</p></div>
+          ) : blobUrl ? (
+            <>
+              {isPdf && <iframe src={blobUrl} title={doc.label} className="doc-preview-iframe" />}
+              {isImg && <img src={blobUrl} alt={doc.label} className="doc-preview-img" />}
+              {!isPdf && !isImg && (
+                <div className="doc-empty">
+                  <Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" size={40} stroke="#9aa5b4" />
+                  <p>Preview not available for this file type.</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="doc-empty"><p>Failed to load preview. Please try downloading the file.</p></div>
           )}
         </div>
       </div>

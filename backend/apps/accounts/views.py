@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
@@ -5,8 +6,20 @@ from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from .auth import VersionedRefreshToken
 
 from apps.employees.models import User
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_decode
+from django.utils.encoding import force_str
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.db.models import F
+from .utils import send_invite_email
+from django_ratelimit.decorators import ratelimit
+from apps.analytics.utils import log_event
 
 # ─────────────────────────────────────────────
 # CUSTOM THROTTLE — LOGIN
@@ -29,6 +42,8 @@ class LoginRateThrottle(AnonRateThrottle):
 
 @api_view(['POST'])
 @throttle_classes([LoginRateThrottle])
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
+@ratelimit(key='post:username', rate='5/m', method='POST', block=True)
 def login_view(request):
     """
     Authenticate and return JWT tokens.
@@ -64,20 +79,40 @@ def login_view(request):
             pass
 
     if user:
-        emp = getattr(user, "employee_profile", None)
-        refresh = RefreshToken.for_user(user)
+        # Security Hardening: Track last login IP (Proxy-aware)
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        user.last_login_ip = x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+        user.save(update_fields=['last_login_ip'])
 
-        return Response({
+        emp = getattr(user, "employee_profile", None)
+        refresh = VersionedRefreshToken.for_user(user)
+        access = refresh.access_token
+        access['token_version'] = user.token_version
+
+        log_event(user, "login_success", request=request)
+
+        response = Response({
             "status":               "success",
             "username":             user.username,
             "role":                 user.role,
             "must_change_password": user.must_change_password,
             "emp_id":               emp.emp_id if emp else None,
-            "access":               str(refresh.access_token),
-            "refresh":              str(refresh),
+            "access":               str(access),
         })
 
+        # Securely set refresh token in httpOnly cookie
+        response.set_cookie(
+            key='refresh_token',
+            value=str(refresh),
+            httponly=True,
+            secure=not settings.DEBUG,  # True in production
+            samesite='Lax',
+            path='/api/token/refresh/',
+        )
+        return response
+
     # Generic message — intentionally does NOT reveal whether the username exists
+    log_event(None, "login_failed", {"username_input": username_input}, request=request)
     return Response(
         {"status": "error", "message": "Invalid credentials"},
         status=401,
@@ -96,17 +131,26 @@ def logout_view(request):
     new access tokens after logout.  The client must also clear its own
     localStorage / cookie store.
     """
-    refresh_token = request.data.get('refresh')
+    refresh_token = request.data.get('refresh') or request.COOKIES.get('refresh_token')
     if not refresh_token:
         return Response({'error': 'refresh token is required'}, status=400)
 
     try:
         token = RefreshToken(refresh_token)
-        token.blacklist()          # requires rest_framework_simplejwt.token_blacklist in INSTALLED_APPS
+        token.blacklist()
+        
+        # Security Hardening: Increment token_version on logout to invalidate ALL active access tokens
+        user = request.user
+        user.token_version = F('token_version') + 1
+        user.save(update_fields=['token_version'])
+        
+        log_event(user, "logout_success", request=request)
     except TokenError as e:
         return Response({'error': str(e)}, status=400)
 
-    return Response({'message': 'Successfully logged out.'})
+    response = Response({'message': 'Successfully logged out. All sessions invalidated.'})
+    response.delete_cookie('refresh_token', path='/api/token/refresh/')
+    return response
 
 
 # ─────────────────────────────────────────────
@@ -129,6 +173,82 @@ def change_password(request):
 
     user.set_password(new_password)
     user.must_change_password = False
-    user.save()
+    user.token_version = F('token_version') + 1  # Atomic increment
+    user.save(update_fields=['password', 'must_change_password', 'token_version'])
+    user.refresh_from_db()  # Reload the new version from DB
 
-    return Response({"message": "Password changed successfully"})
+    # Blacklist all outstanding tokens (sessions) for this user
+    tokens = OutstandingToken.objects.filter(user=user)
+    for token in tokens:
+        BlacklistedToken.objects.get_or_create(token=token)
+
+    log_event(user, "password_changed", {"ip": request.META.get("REMOTE_ADDR")}, request=request)
+
+    return Response({"message": "Password changed successfully. All existing sessions have been invalidated."})
+
+
+# ─────────────────────────────────────────────
+# EMAIL ONBOARDING
+# ─────────────────────────────────────────────
+
+@api_view(['POST'])
+@ratelimit(key='ip', rate='5/m', method='POST', block=True)
+def set_password_view(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        password = request.data.get('password')
+        if not password:
+            return Response({'error': 'Password is required'}, status=400)
+            
+        try:
+            validate_password(password, user)
+        except ValidationError as e:
+            return Response({'error': e.messages}, status=400)
+
+        user.set_password(password)
+        user.is_invited = False
+        user.must_change_password = False
+        user.token_version = F('token_version') + 1
+        user.save(update_fields=['password', 'is_invited', 'must_change_password', 'token_version'])
+        user.refresh_from_db()
+        
+        # Blacklist any tokens issued before password was set
+        tokens = OutstandingToken.objects.filter(user=user)
+        for token in tokens:
+            BlacklistedToken.objects.get_or_create(token=token)
+
+        log_event(user, "password_set", {"ip": request.META.get("REMOTE_ADDR")}, request=request)
+        return Response({'message': 'Password has been set successfully. You can now login.'})
+    else:
+        return Response({'error': 'The invite link is invalid or has expired.'}, status=400)
+
+
+@api_view(['POST'])
+@ratelimit(key='ip', rate='3/m', method='POST', block=True)
+@permission_classes([IsAuthenticated])
+def resend_invite_view(request, emp_id):
+    if request.user.role not in ('admin', 'hr'):
+        return Response({'error': 'Admin or HR access required'}, status=403)
+        
+    try:
+        user = User.objects.get(username=emp_id)
+    except User.DoesNotExist:
+        # User enumeration protection: pretend we sent it
+        return Response({'message': 'If account exists, email sent'})
+
+    # Check 5 minutes cooldown
+    if user.invite_sent_at and (timezone.now() - user.invite_sent_at).total_seconds() < 300:
+        return Response({'error': 'Please wait 5 minutes before resending the invite'}, status=429)
+
+    user.invite_sent_at = timezone.now()
+    user.save()
+    
+    send_invite_email(user)
+    log_event(request.user, "resend_invite", {"target_user": user.username}, request=request)
+    
+    return Response({'message': 'If account exists, email sent'})

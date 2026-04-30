@@ -123,11 +123,26 @@ def document_delete(request, pk):
     except EmployeeDocument.DoesNotExist:
         return Response({'error': 'Document not found.'}, status=404)
 
+    # Log the deletion event before deleting the record
+    from apps.analytics.utils import log_event
+    log_event(
+        request.user, 
+        "document_deleted", 
+        {
+            "doc_id": doc.id, 
+            "doc_type": doc.doc_type, 
+            "label": doc.label,
+            "employee_id": doc.employee.emp_id,
+            "file_name": os.path.basename(doc.file.name)
+        }, 
+        request=request
+    )
+
     # Remove physical file from disk
     if doc.file and os.path.isfile(doc.file.path):
         os.remove(doc.file.path)
     doc.delete()
-    return Response({'message': 'Document deleted.'})
+    return Response({'message': 'Document deleted successfully and action logged.'})
 
 
 @api_view(['GET'])
@@ -155,6 +170,11 @@ def document_download(request, pk):
 
     file_name = os.path.basename(doc.file.name)
     response  = FileResponse(open(doc.file.path, 'rb'), as_attachment=True, filename=file_name)
+    
+    # Log the download event
+    from apps.analytics.utils import log_event
+    log_event(request.user, "document_downloaded", {"doc_id": doc.id, "doc_type": doc.doc_type}, request=request)
+    
     return response
 
 
@@ -220,3 +240,35 @@ def document_audit_log(request):
     } for d in qs]
 
     return Response(data)
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def document_preview(request, pk):
+    """
+    GET /api/documents/<pk>/preview/
+    Serves the file for browser viewing (inline).
+    Enforces same permissions as download.
+    """
+    try:
+        doc = EmployeeDocument.objects.select_related('employee__user').get(pk=pk)
+    except EmployeeDocument.DoesNotExist:
+        return Response({'error': 'Document not found.'}, status=404)
+
+    is_privileged = request.user.role in ('admin', 'hr')
+    is_own        = hasattr(request.user, 'employee_profile') and \
+                    request.user.employee_profile == doc.employee
+
+    if not (is_privileged or is_own):
+        return Response({'error': 'Forbidden.'}, status=403)
+
+    if not os.path.isfile(doc.file.path):
+        return Response({'error': 'File not found on server.'}, status=404)
+
+    # Use 'inline' to allow browser rendering (like PDF preview)
+    response = FileResponse(open(doc.file.path, 'rb'), content_type=None)
+    response['Content-Disposition'] = 'inline'
+    
+    # Log the view event
+    from apps.analytics.utils import log_event
+    log_event(request.user, "document_viewed", {"doc_id": doc.id, "doc_type": doc.doc_type}, request=request)
+    
+    return response

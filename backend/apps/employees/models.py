@@ -28,6 +28,12 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
     must_change_password = models.BooleanField(default=True)
+    token_version = models.IntegerField(default=0, db_index=True)
+    last_login_ip = models.GenericIPAddressField(null=True, blank=True)
+    
+    email = models.EmailField(unique=True, blank=True, null=True)
+    is_invited = models.BooleanField(default=False)
+    invite_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'User'
@@ -173,6 +179,19 @@ class Employee(models.Model):
 
     def __str__(self):
         return f"{self.emp_id} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        """
+        Data Integrity Enforcement:
+        Ensure 'ipa_salary' and 'salary' are always in sync.
+        We treat 'ipa_salary' as the primary source for consistency.
+        """
+        if self.ipa_salary is not None:
+            self.salary = self.ipa_salary
+        elif self.salary is not None:
+            self.ipa_salary = self.salary
+            
+        super().save(*args, **kwargs)
 
     # ── Computed helpers
     @property
