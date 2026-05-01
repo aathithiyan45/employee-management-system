@@ -56,7 +56,6 @@ function UploadPanel({ onSuccess }) {
   const [file, setFile]           = useState(null);
   const [status, setStatus]       = useState("idle"); // idle | ready | uploading | processing | success | error
   const [progress, setProgress]   = useState(0);
-  const [jobId, setJobId]         = useState(null);
   const [result, setResult]       = useState(null);
   const [errorMsg, setErrorMsg]   = useState("");
   const [dragOver, setDragOver]   = useState(false);
@@ -107,7 +106,7 @@ function UploadPanel({ onSuccess }) {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setJobId(res.data.job_id);
+
       setStatus("processing");
       pollStatus(res.data.job_id);
 

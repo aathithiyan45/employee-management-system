@@ -1,18 +1,23 @@
 import axios from "axios";
 
-// Access token is stored in memory only for XSS protection
+// Base URL from env — set REACT_APP_API_URL in production .env
+const BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
+
+// Access token stored in memory only (never localStorage/sessionStorage) — XSS protection
 let accessToken = null;
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/",
-  withCredentials: true,
+  baseURL: BASE_URL,
+  withCredentials: true, // sends httpOnly refresh-token cookie automatically
 });
 
 export const setAccessToken = (token) => {
   accessToken = token;
 };
 
-// Interceptor to add Bearer token to requests
+export const getAccessToken = () => accessToken;
+
+// ── Request interceptor — attach Bearer token ──────────────
 api.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
@@ -20,45 +25,56 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor to handle 401 Unauthorized and token refresh
+// ── Response interceptor — silent token refresh on 401 ─────
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const originalRequest = error.config;
-    
-    // If we get 401 and haven't tried to refresh yet
-    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.includes('token/refresh')) {
+
+    // Attempt refresh once — guard against loops on the refresh endpoint itself
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url.includes("token/refresh")
+    ) {
       originalRequest._retry = true;
-      
+
       try {
-        // Attempt to refresh token using httpOnly cookie
-        const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {}, { withCredentials: true });
-        
+        // httpOnly cookie is sent automatically by withCredentials
+        const res = await axios.post(
+          `${BASE_URL}token/refresh/`,
+          {},
+          { withCredentials: true }
+        );
+
         accessToken = res.data.access;
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-        
+
         return api(originalRequest);
-      } catch (err) {
-        // If refresh fails, session is truly dead
+      } catch (refreshErr) {
+        // Refresh failed — session is truly dead, send back to login
+        accessToken = null;
         localStorage.removeItem("user");
-        window.location.href = "/login";
-        return Promise.reject(err);
+        window.location.href = "/"; // Login is at "/" not "/login"
+        return Promise.reject(refreshErr);
       }
     }
-    
+
     return Promise.reject(error);
   }
 );
 
+// ── Logout — blacklists refresh token server-side ──────────
 export async function logout() {
   try {
     await api.post("logout/");
   } catch (err) {
-    console.error("Logout failed", err);
+    // Continue logout even if server call fails
+    console.error("Logout server call failed:", err);
   } finally {
     accessToken = null;
     localStorage.removeItem("user");
-    window.location.href = "/login";
+    window.location.href = "/"; // Login is at "/" not "/login"
   }
 }
 

@@ -1,21 +1,32 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
+import { Line } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from "chart.js";
 import "./EmployeeDetail.css";
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 function EmployeeDetail() {
   const { empId } = useParams();
   const navigate = useNavigate();
   const [emp, setEmp] = useState(null);
+  const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
-    api
-      .get(`employees/${empId}/`)
-      .then((res) => {
-        setEmp(res.data);
+    Promise.all([
+      api.get(`employees/${empId}/`),
+      api.get(`payroll/?employee_id=${empId}`)
+    ])
+      .then(([empRes, payrollRes]) => {
+        setEmp(empRes.data);
+        const fetchedPayrolls = payrollRes.data.results || payrollRes.data;
+        // Sort by month ascending for the chart
+        const sorted = fetchedPayrolls.sort((a, b) => new Date(a.month) - new Date(b.month));
+        setPayrolls(sorted);
         setLoading(false);
       })
       .catch(() => {
@@ -45,6 +56,33 @@ function EmployeeDetail() {
     );
 
   const isActive = emp.status?.toLowerCase() === "active";
+
+  const chartData = {
+    labels: payrolls.map(p => p.month.substring(0, 7)),
+    datasets: [
+      {
+        label: "Monthly Salary ($)",
+        data: payrolls.map(p => parseFloat(p.total_salary)),
+        borderColor: "#2dd4bf", 
+        backgroundColor: "rgba(45, 212, 191, 0.1)",
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true,
+        pointBackgroundColor: "#2dd4bf"
+      }
+    ]
+  };
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+    },
+    scales: {
+      y: { beginAtZero: true }
+    }
+  };
 
   return (
     <div className="detail-page">
@@ -118,6 +156,15 @@ function EmployeeDetail() {
           <Field label="Salary" value={val(emp.salary)} />
           <Field label="Bank Account" value={val(emp.bank_account)} />
         </Section>
+        
+        {/* Payroll Trend */}
+        {payrolls.length > 0 && (
+          <Section title="Monthly Salary Trend" icon="📈" wide>
+            <div style={{ height: "300px", width: "100%", position: "relative" }}>
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          </Section>
+        )}
 
         {/* Work Permit */}
         <Section title="Work Permit" icon="📋">

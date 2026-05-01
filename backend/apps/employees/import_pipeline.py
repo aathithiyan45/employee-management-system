@@ -198,17 +198,27 @@ class EmployeeImportPipeline:
                     email = d['email']
                     if username in user_map:
                         u = user_map[username]
+                        # Update email if it changed in the Excel
                         if u.email != email:
                             u.email = email
                             users_to_update.append(u)
+                        
+                        # If existing user still has no password, invite them
+                        if not u.has_usable_password():
+                            new_users_to_invite.append(u)
+                            logger.info(f"Existing user {username} has no password, adding to invite list.")
                     else:
+                        # New user: create and invite
                         u = User(username=username, email=email, role='employee')
                         u.set_unusable_password()
                         users_to_create.append(u)
                         new_users_to_invite.append(u)
+                        logger.info(f"New user {username} created, adding to invite list.")
 
-                if users_to_create: User.objects.bulk_create(users_to_create)
-                if users_to_update: User.objects.bulk_update(users_to_update, fields=['email'])
+                if users_to_create:
+                    User.objects.bulk_create(users_to_create)
+                if users_to_update:
+                    User.objects.bulk_update(users_to_update, fields=['email'])
 
                 user_map = {u.username: u for u in User.objects.filter(username__in=[d['emp_id'] for d in chunk_data])}
                 emp_map = {e.emp_id: e for e in Employee.objects.filter(emp_id__in=[d['emp_id'] for d in chunk_data])}
@@ -278,10 +288,18 @@ class EmployeeImportPipeline:
                     with transaction.atomic():
                         username = d['emp_id']
                         email = d['email']
-                        user, _ = User.objects.get_or_create(username=username, defaults={"email": email, "role": "employee"})
-                        if user.email != email:
-                            user.email = email
-                            user.save(update_fields=['email'])
+                        user, created = User.objects.get_or_create(username=username, defaults={"email": email, "role": "employee"})
+                        if not created:
+                            if user.email != email:
+                                user.email = email
+                                user.save(update_fields=['email'])
+                        else:
+                            user.set_unusable_password()
+                            user.save()
+                        
+                        # Invite if new OR existing without password
+                        if not user.has_usable_password():
+                            new_users_to_invite.append(user)
                         
                         rd = d['row_dict']
                         fields = {

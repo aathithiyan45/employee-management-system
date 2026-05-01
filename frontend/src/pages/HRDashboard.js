@@ -33,15 +33,6 @@ function Toast({ message, type, onClose }) {
   );
 }
 
-// ── Status badge ──────────────────────────────────────────
-function StatusBadge({ status }) {
-  const s   = (status || "").toLowerCase();
-  const cls = s.includes("approved") ? "approved"
-    : s.includes("pending")  ? "pending"
-    : s.includes("rejected") ? "rejected"
-    : s.includes("cancelled")? "cancelled" : "default";
-  return <span className={`hr-badge hr-badge--${cls}`}>{status}</span>;
-}
 
 // ── Confirm Modal ─────────────────────────────────────────
 function ReviewModal({ request, action, onConfirm, onCancel, loading }) {

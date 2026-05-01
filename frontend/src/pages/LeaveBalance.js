@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../axiosInstance";
 import "./LeaveManagement.css";
@@ -237,7 +237,7 @@ function LeaveBalance() {
   const showToast = (message, type = "success") => setToast({ message, type });
 
   // ── GET /leave/balance/{emp_id}/?year=YYYY  →  leave_balance view ──
-  const fetchBalance = () => {
+  const fetchBalance = useCallback(() => {
     if (!empId) return;
     setLoading(true);
     api.get(`leave/balance/${empId}/?year=${year}`)
@@ -247,20 +247,20 @@ function LeaveBalance() {
         else showToast(err.response?.data?.error || "Failed to load balance", "error");
       })
       .finally(() => setLoading(false));
-  };
+  }, [empId, year]);
 
   // ── GET /leave/requests/?emp_id=X  →  leave history ──────
-  const fetchHistory = () => {
+  const fetchHistory = useCallback(() => {
     if (!empId) return;
     setHistLoading(true);
     api.get(`leave/requests/?emp_id=${empId}&page_size=10`)
       .then(res => setHistory(res.data.results || []))
       .catch(() => {})
       .finally(() => setHistLoading(false));
-  };
+  }, [empId]);
 
-  useEffect(() => { fetchBalance(); }, [empId, year]);
-  useEffect(() => { fetchHistory(); }, [empId]);
+  useEffect(() => { fetchBalance(); }, [fetchBalance]);
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
   const ringConfigs = balance ? [
     { key: "medical", label: "Medical Leave",  color: "#3b82f6", ...balance.medical },

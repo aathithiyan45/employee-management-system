@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apps.leave',
     'apps.documents',
     'apps.analytics',
+    'apps.payroll',
 ]
 
 

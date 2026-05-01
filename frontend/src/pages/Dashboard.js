@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api, { logout } from "../axiosInstance";
+import api from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import {
@@ -232,9 +232,6 @@ function Dashboard() {
     }
   };
 
-  // ── Logout — clear all local storage keys ────────────────
-  // logout() blacklists refresh token server-side before clearing localStorage
-  const handleLogout = () => logout();
 
   // ── Stat card click → navigate to employees with filters ─
   const getCardFilter = (label) => {

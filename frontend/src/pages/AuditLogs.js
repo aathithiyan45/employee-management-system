@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../axiosInstance';
 import './AuditLogs.css';
 
@@ -7,16 +7,13 @@ const AuditLogs = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [filters, setFilters] = useState({
+        
         user: '',
         action: '',
         date: ''
     });
 
-    useEffect(() => {
-        fetchLogs();
-    }, []);
-
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
         setLoading(true);
         try {
             const params = new URLSearchParams();
@@ -32,7 +29,11 @@ const AuditLogs = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filters]);
+
+    useEffect(() => {
+        fetchLogs();
+    }, [fetchLogs]);
 
     const handleFilterChange = (e) => {
         setFilters({ ...filters, [e.target.name]: e.target.value });

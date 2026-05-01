@@ -16,6 +16,8 @@ import ChangePassword from "./pages/ChangePassword";
 import SetPassword    from "./pages/SetPassword";
 import AuditLogs      from "./pages/AuditLogs";
 import Documents     from "./pages/Documents";
+import WorkLog       from "./pages/WorkLog";
+import Payroll       from "./pages/Payroll";
 import PrivateRoute   from "./components/PrivateRoute";
 
 import "./App.css";
@@ -56,6 +58,12 @@ function App() {
         } />
         <Route path="/leave/balance/:empId" element={
           <PrivateRoute requiredRole="admin"><LeaveBalance /></PrivateRoute>
+        } />
+        <Route path="/worklog" element={
+          <PrivateRoute requiredRole="admin"><WorkLog /></PrivateRoute>
+        } />
+        <Route path="/payroll" element={
+          <PrivateRoute requiredRole="admin"><Payroll /></PrivateRoute>
         } />
 
         {/* ── HR only ─────────────────────────────────────── */}

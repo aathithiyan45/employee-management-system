@@ -18,8 +18,8 @@ def send_invite_email(user):
         token = default_token_generator.make_token(user)
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         
-        # Determine base frontend URL for local network access
-        frontend_url = "http://192.168.0.196:3000"
+        # Determine base frontend URL for local access
+        frontend_url = "http://localhost:3000"
         
         # In production, you would typically use an environment variable or CORS setting:
         # if hasattr(settings, 'CORS_ALLOWED_ORIGINS') and settings.CORS_ALLOWED_ORIGINS:
