@@ -1,4 +1,4 @@
-from rest_framework import viewsets, views, status
+from rest_framework import viewsets, views, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -42,12 +42,17 @@ class PayrollViewSet(viewsets.ModelViewSet):
     serializer_class = PayrollSerializer
     permission_classes = [IsAuthenticated, IsAdminOrHR]
 
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['employee__name', 'employee__emp_id']
+    ordering_fields = ['total_salary', 'total_hours', 'employee__name']
+    ordering = ['-total_salary']
+
     def get_queryset(self):
         queryset = super().get_queryset()
         employee_id = self.request.query_params.get('employee_id', None)
         year = self.request.query_params.get('year', None)
-
         month = self.request.query_params.get('month', None)
+        status = self.request.query_params.get('status', None)
 
         if employee_id:
             if employee_id.isdigit():
@@ -58,6 +63,9 @@ class PayrollViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(month__year=year)
         if month:
             queryset = queryset.filter(month=month if '-' in month and len(month) > 7 else month + "-01")
+        if status and status.lower() != 'all':
+            queryset = queryset.filter(status__iexact=status)
+            
         return queryset
 
     @action(detail=False, methods=['post'])
@@ -119,8 +127,15 @@ class PayrollAnalyticsView(views.APIView):
 
         payrolls = Payroll.objects.filter(month__year=target_date.year, month__month=target_date.month)
 
-        # Monthly total
+        # Monthly total & avg
         total_salary = payrolls.aggregate(total=Sum('total_salary'))['total'] or 0.0
+        total_hours_sum = payrolls.aggregate(total=Sum('total_hours'))['total'] or 0.0
+        employee_count = payrolls.count()
+        avg_salary = (total_salary / employee_count) if employee_count > 0 else 0.0
+
+        # Pending count & Zero worklogs count
+        pending_payroll_count = payrolls.filter(status='Pending').count()
+        employees_with_no_worklogs = payrolls.filter(total_hours=0).count()
 
         # By division
         division_data = list(payrolls.values(division_name=F('employee__division__name')).annotate(
@@ -132,9 +147,33 @@ class PayrollAnalyticsView(views.APIView):
             'employee__name', 'total_salary'
         )[:5])
 
+
+        # Monthly Trend (last 12 months overall)
+        from dateutil.relativedelta import relativedelta
+        import datetime
+        twelve_months_ago = datetime.date.today() - relativedelta(months=12)
+        trend_payrolls = Payroll.objects.filter(month__gte=twelve_months_ago)
+        monthly_trend = list(trend_payrolls.values('month').annotate(
+            total=Sum('total_salary')
+        ).order_by('month'))
+
+        # Format trend data nicely
+        formatted_trend = []
+        for item in monthly_trend:
+            month_str = item['month'].strftime('%b %Y') if isinstance(item['month'], datetime.date) else item['month']
+            formatted_trend.append({
+                "month": month_str,
+                "total": item['total']
+            })
+
         return Response({
             "total_salary": total_salary,
+            "total_hours": total_hours_sum,
+            "avg_salary": avg_salary,
+            "pending_count": pending_payroll_count,
+            "no_worklogs_count": employees_with_no_worklogs,
             "division_data": division_data,
             "top_employees": top_employees,
+            "monthly_trend": formatted_trend,
             "month": target_date.strftime('%Y-%m')
         })

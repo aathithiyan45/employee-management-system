@@ -255,10 +255,22 @@ function EmployeeDetail() {
             <div className="remarks-text">{emp.remarks}</div>
           </Section>
         )}
+        
+        {/* Payroll Trend */}
+        <Section title="Monthly Payroll Trend" icon="📈" wide>
+          {payrolls.length > 0 ? (
+            <div style={{ height: "250px", width: "100%", marginTop: "10px" }}>
+              <Line data={chartData} options={chartOptions} />
+            </div>
+          ) : (
+            <p style={{ color: "var(--grey-500)", fontStyle: "italic", marginTop: "10px" }}>No payroll history available.</p>
+          )}
+        </Section>
       </div>
     </div>
   );
 }
+
 
 /* ── Helper Components ───────────────────────────────── */
 

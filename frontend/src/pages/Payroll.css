@@ -203,8 +203,219 @@
   color: var(--grey-800);
 }
 
+/* Analytics Cards */
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.analytics-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--grey-200);
+  position: relative;
+  overflow: hidden;
+}
+
+.analytics-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.analytics-card.total::after { background: var(--blue-500); }
+.analytics-card.division::after { background: var(--warning); }
+.analytics-card.earner::after { background: var(--success); }
+
+.analytics-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--grey-500);
+  margin-bottom: 8px;
+}
+
+.analytics-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--grey-900);
+  margin-bottom: 4px;
+}
+
+/* Additional Analytics Card Styles */
+.analytics-card.hours::after { background: var(--purple-500); }
+.analytics-card.warning-card::after { background: var(--danger); }
+.analytics-card.pending-card::after { background: var(--warning); }
+
+.analytics-card.avg::after { background: var(--teal-500); }
+.analytics-card.total .analytics-value { color: var(--blue-700); }
+.analytics-card.division .analytics-value { color: var(--warning); }
+.analytics-card.avg .analytics-value { color: var(--teal-600); }
+.analytics-card.hours .analytics-value { color: var(--purple-600); }
+
+.analytics-subtext {
+
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--grey-600);
+}
+
+/* Charts Section */
+.payroll-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.chart-card {
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--grey-100);
+}
+
+.chart-card h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--grey-800);
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.chart-container {
+  height: 250px;
+  position: relative;
+}
+
+/* Table Filters Bar */
+.table-filters-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  background: var(--blue-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--blue-100);
+  padding: 12px 16px;
+}
+
+.stats-text {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--blue-700);
+}
+
+.filters-right {
+  display: flex;
+  gap: 12px;
+}
+
+.search-input {
+  width: 240px;
+  height: 36px;
+}
+
+.status-select {
+  width: 140px;
+  height: 36px;
+}
+
+/* Total Hours Badge */
+.total-hours-badge {
+  background: var(--purple-50);
+  color: var(--purple-700);
+  border: 1px solid var(--purple-200);
+  padding: 6px 12px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Missing Logs Badge */
+.missing-logs-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-data-text {
+  font-weight: 600;
+  color: var(--grey-600);
+  font-size: 13px;
+}
+
+.warning-text {
+  font-size: 10px;
+  color: var(--danger);
+  background: var(--danger-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+/* Sortable Headers */
+.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.sortable:hover {
+  background: rgba(0,0,0,0.02);
+}
+
+/* Better Status Pills */
+.status-pill.paid {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  font-weight: 600;
+}
+
+.status-pill.pending {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid rgba(239, 108, 0, 0.2);
+  font-weight: 600;
+}
+
+.success-btn {
+  background: var(--success) !important;
+  pointer-events: none;
+}
+
+/* Disabled Action Button */
+.action-btn.disabled {
+  background: var(--grey-100);
+  color: var(--grey-400);
+  cursor: not-allowed;
+  border: 1px solid var(--grey-200);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Pagination */
 .pagination {
+
+
   display: flex;
   align-items: center;
   justify-content: center;
