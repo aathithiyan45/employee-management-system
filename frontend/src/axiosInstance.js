@@ -1,63 +1,65 @@
 import axios from "axios";
 
+// Access token is stored in memory only for XSS protection
+let accessToken = null;
+
 const api = axios.create({
   baseURL: "http://127.0.0.1:8000/api/",
   withCredentials: true,
 });
 
-// Attach JWT token to every request
+export const setAccessToken = (token) => {
+  accessToken = token;
+};
+
+// Interceptor to add Bearer token to requests
 api.interceptors.request.use((config) => {
-  const user = JSON.parse(localStorage.getItem("user") || "null");
-  if (user && user.access) {
-    config.headers.Authorization = `Bearer ${user.access}`;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
 
-// Auto-refresh token on 401
+// Interceptor to handle 401 Unauthorized and token refresh
 api.interceptors.response.use(
   (res) => res,
   async (error) => {
-    const original = error.config;
-    if (error.response?.status === 401 && !original._retry && !original.url.includes('token/refresh')) {
-      original._retry = true;
+    const originalRequest = error.config;
+    
+    // If we get 401 and haven't tried to refresh yet
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url.includes('token/refresh')) {
+      originalRequest._retry = true;
+      
       try {
-        // We no longer send the refresh token in the body; it's in the httpOnly cookie.
-        // We must use withCredentials: true (set globally above) so the browser sends it.
+        // Attempt to refresh token using httpOnly cookie
         const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {}, { withCredentials: true });
         
-        const user = JSON.parse(localStorage.getItem("user") || "null");
-        user.access = res.data.access;
-        localStorage.setItem("user", JSON.stringify(user));
+        accessToken = res.data.access;
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         
-        original.headers.Authorization = `Bearer ${res.data.access}`;
-        return api(original);
+        return api(originalRequest);
       } catch (err) {
-        localStorage.clear();
-        window.location.href = "/";
+        // If refresh fails, session is truly dead
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+        return Promise.reject(err);
       }
     }
+    
     return Promise.reject(error);
   }
 );
 
-/**
- * logout() — blacklists the refresh token on the server, then clears local state.
- * Call this instead of directly clearing localStorage so the old refresh token
- * cannot be replayed after the user signs out.
- *
- * Usage (replace any existing localStorage.clear() + redirect pattern):
- *   import { logout } from "../axiosInstance";
- *   <button onClick={logout}>Sign out</button>
- */
 export async function logout() {
   try {
     await api.post("logout/");
-  } catch {
-    //
+  } catch (err) {
+    console.error("Logout failed", err);
+  } finally {
+    accessToken = null;
+    localStorage.removeItem("user");
+    window.location.href = "/login";
   }
-  localStorage.clear();
-  window.location.href = "/";
 }
 
 export default api;

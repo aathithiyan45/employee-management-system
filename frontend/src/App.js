@@ -14,6 +14,7 @@ import LeaveManagement from "./pages/LeaveManagement";
 import LeaveBalance   from "./pages/LeaveBalance";
 import ChangePassword from "./pages/ChangePassword";
 import SetPassword    from "./pages/SetPassword";
+import AuditLogs      from "./pages/AuditLogs";
 import Documents     from "./pages/Documents";
 import PrivateRoute   from "./components/PrivateRoute";
 
@@ -43,6 +44,9 @@ function App() {
         } />
         <Route path="/import" element={
           <PrivateRoute requiredRole="admin"><ImportEmployees /></PrivateRoute>
+        } />
+        <Route path="/audit-logs" element={
+          <PrivateRoute requiredRole="admin"><AuditLogs /></PrivateRoute>
         } />
 
         {/* ── Admin + HR shared routes ─────────────────────

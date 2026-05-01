@@ -2,12 +2,14 @@ from datetime import timedelta
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
+from django.db.models import Count, Q
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 
 from apps.employees.models import Employee
+from .models import AuditLog
 
 # ─────────────────────────────────────────────
 # CHARTS
@@ -126,3 +128,39 @@ def chart_designation_breakdown(request):
             'borderWidth': 1,
         }],
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def audit_log_list(request):
+    user_query = request.GET.get('user')
+    action_query = request.GET.get('action')
+    date_query = request.GET.get('date')
+
+    queryset = AuditLog.objects.all().select_related('user')
+
+    if user_query:
+        queryset = queryset.filter(
+            Q(user__username__icontains=user_query) | 
+            Q(user__first_name__icontains=user_query) | 
+            Q(user__last_name__icontains=user_query)
+        )
+    
+    if action_query:
+        queryset = queryset.filter(event__icontains=action_query)
+        
+    if date_query:
+        queryset = queryset.filter(created_at__date=date_query)
+
+    # Simple manual serialization for brevity
+    data = []
+    for log in queryset[:100]: # Limit to 100 for performance
+        data.append({
+            'id': log.id,
+            'timestamp': log.created_at,
+            'user_display': f"{log.user.get_full_name()} ({log.user.username})" if log.user else "System",
+            'action': log.event,
+            'metadata': log.details,
+            'ip_address': log.ip_address
+        })
+
+    return Response(data)

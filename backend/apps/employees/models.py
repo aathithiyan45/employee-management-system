@@ -7,12 +7,13 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+import uuid
+from datetime import date
 
 
 def get_current_year():
     """Callable default for LeaveBalance.year — evaluated per-instance, not at class load."""
     return timezone.now().year
-from datetime import date
 
 
 # ─────────────────────────────────────────────
@@ -225,3 +226,35 @@ class Employee(models.Model):
         if self.passport_expiry:
             return (self.passport_expiry - date.today()).days <= 90
         return False
+
+class ImportJob(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    progress = models.IntegerField(default=0) # 0 to 100
+    
+    file_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True) # SHA-256
+    total_rows = models.IntegerField(default=0)
+    success_count = models.IntegerField(default=0)
+    failed_count = models.IntegerField(default=0)
+    
+    error_summary = models.JSONField(null=True, blank=True)
+    error_file = models.FileField(upload_to='import_errors/', null=True, blank=True)
+    
+    message = models.TextField(null=True, blank=True)
+    duration_ms = models.IntegerField(default=0)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"ImportJob {self.id} - {self.status} ({self.progress}%)"

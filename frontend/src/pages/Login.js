@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import { setAccessToken } from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 
@@ -48,9 +49,12 @@ function Login() {
         return;
       }
 
-      // Persist session
-      localStorage.setItem("user",    JSON.stringify(data));
-      localStorage.setItem("access",  data.access);
+      // Persist session (excluding access token for security)
+      const { access, ...userData } = data;
+      localStorage.setItem("user", JSON.stringify(userData));
+      
+      // Store access token in memory
+      setAccessToken(access);
 
       // Force password change on first login
       if (data.must_change_password) {

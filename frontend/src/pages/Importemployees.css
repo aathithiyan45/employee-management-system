@@ -862,3 +862,73 @@
   font-size: 13.5px;
   color: #15803d;
 }
+/* ── Processing / Progress State ────────────────────────── */
+.processing-state {
+  padding: 30px 24px;
+  text-align: center;
+}
+
+.progress-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--grey-800);
+  margin-bottom: 15px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 10px;
+  background: var(--grey-100);
+  border-radius: 5px;
+  overflow: hidden;
+  border: 1px solid var(--grey-200);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue-600), var(--teal-500));
+  transition: width 0.4s ease;
+}
+
+.stat-pill.success-pill {
+  background: linear-gradient(135deg, #dcfce7, #86efac);
+  border: 1px solid #4ade80;
+}
+
+.stat-pill.failed-pill {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  border: 1px solid #fca5a5;
+}
+
+.error-download-zone {
+  background: #fff;
+  border: 1px dashed #fca5a5;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.error-download-zone p {
+  font-size: 13px;
+  color: #991b1b;
+  margin-bottom: 12px;
+}
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #ef4444;
+  color: white;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.download-btn:hover {
+  background: #dc2626;
+}

@@ -314,7 +314,7 @@ def validate_upload(file, allowed_extensions, allowed_magic, max_bytes):
 @permission_classes([IsAuthenticated])
 def import_excel(request):
     """
-    Production-grade Excel import with strict validation and partial success.
+    Asynchronous Excel import with progress tracking.
     """
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "Admin or HR access only"}, status=403)
@@ -334,30 +334,92 @@ def import_excel(request):
     if not ok:
         return Response({"error": err}, status=400)
 
-    # 2. Run Pipeline
-    from .import_pipeline import EmployeeImportPipeline
-    pipeline = EmployeeImportPipeline(file, request.user)
-    success, result = pipeline.run()
+    # 2. Calculate file hash for idempotency
+    import hashlib
+    sha256_hash = hashlib.sha256()
+    for chunk in file.chunks():
+        sha256_hash.update(chunk)
+    file_hash = sha256_hash.hexdigest()
 
-    if not success:
-        return Response({"error": result}, status=400)
+    # Check for recent identical jobs (last 5 minutes and only if still active)
+    from .models import ImportJob
+    from django.utils import timezone
+    from datetime import timedelta
+    
+    recent_job = ImportJob.objects.filter(
+        file_hash=file_hash,
+        created_at__gte=timezone.now() - timedelta(minutes=5),
+        status__in=['processing', 'pending']
+    ).first()
 
-    # 3. Handle Response
-    response_data = {
-        "message": "Import completed",
-        "summary": {
-            "total": result["total"],
-            "success": result["success"],
-            "failed": result["failed"]
-        },
-        "errors": result["errors"][:50], # Limit to first 50 JSON errors
-    }
+    if recent_job:
+        return Response({
+            "message": "This file is already being processed.",
+            "job_id": str(recent_job.id),
+            "status": recent_job.status
+        }, status=200)
 
-    if result["failed"] > 0:
-        response_data["error_report_available"] = True
-        response_data["message"] = f"Import completed with {result['failed']} errors. Download the error report for details."
+    # 3. Save file temporarily for the worker
+    import os
+    import uuid
+    from django.conf import settings
+    
+    temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_imports')
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_filename = f"{uuid.uuid4()}_{file.name}"
+    temp_path = os.path.join(temp_dir, temp_filename)
+    
+    with open(temp_path, 'wb+') as destination:
+        for chunk in file.chunks():
+            destination.write(chunk)
 
-    return Response(response_data)
+    # 4. Create Import Job
+    job = ImportJob.objects.create(
+        created_by=request.user,
+        status='pending',
+        file_hash=file_hash,
+        message="Waiting for worker..."
+    )
+
+    # 4. Trigger Async Task
+    from .tasks import process_employee_import
+    process_employee_import.delay(str(job.id), temp_path, request.user.id)
+
+    return Response({
+        "message": "Import started",
+        "job_id": str(job.id)
+    }, status=202)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def import_status(request, job_id):
+    """
+    Poll the status of an import job.
+    """
+    from .models import ImportJob
+    try:
+        job = ImportJob.objects.get(id=job_id)
+        if job.created_by != request.user and not request.user.is_admin:
+            return Response({"error": "Unauthorized"}, status=403)
+            
+        data = {
+            "id": str(job.id),
+            "status": job.status,
+            "progress": job.progress,
+            "total_rows": job.total_rows,
+            "success_count": job.success_count,
+            "failed_count": job.failed_count,
+            "message": job.message,
+            "duration_ms": job.duration_ms,
+            "created_at": job.created_at
+        }
+        
+        if job.status == 'completed' and job.error_file:
+            data["error_file_url"] = request.build_absolute_uri(job.error_file.url)
+            
+        return Response(data)
+    except ImportJob.DoesNotExist:
+        return Response({"error": "Job not found"}, status=404)
 
 
 # ─────────────────────────────────────────────

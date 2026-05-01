@@ -7,6 +7,7 @@ from .views import (
 
     # Import / Export
     import_excel,
+    import_status,
     export_employees,
 
     # Divisions
@@ -29,6 +30,7 @@ urlpatterns = [
 
     # ── Import / Export ─────────────────────────
     path('import/',          import_excel),
+    path('import/status/<uuid:job_id>/', import_status),
     path('export/',          export_employees),
 
     # ── Divisions ───────────────────────────────

@@ -54,31 +54,45 @@ const ALL_COLS = [
 // ── Upload Panel ──────────────────────────────────────────
 function UploadPanel({ onSuccess }) {
   const [file, setFile]           = useState(null);
-  const [status, setStatus]       = useState("idle"); // idle | ready | uploading | success | error
+  const [status, setStatus]       = useState("idle"); // idle | ready | uploading | processing | success | error
+  const [progress, setProgress]   = useState(0);
+  const [jobId, setJobId]         = useState(null);
   const [result, setResult]       = useState(null);
   const [errorMsg, setErrorMsg]   = useState("");
   const [dragOver, setDragOver]   = useState(false);
-  const [showErrors, setShowErrors] = useState(false);
   const inputRef = useRef();
 
   const handleFile = (f) => {
     if (!f) return;
-    const ext = f.name.split(".").pop().toLowerCase();
-    if (!["xlsx", "xls"].includes(ext)) {
-      setErrorMsg("Only .xlsx / .xls files allowed");
-      setStatus("error");
-      return;
-    }
     setFile(f);
     setStatus("ready");
     setErrorMsg("");
     setResult(null);
+    setProgress(0);
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragOver(false);
-    handleFile(e.dataTransfer.files[0]);
+  const pollStatus = async (id) => {
+    try {
+      const res = await api.get(`import/status/${id}/`);
+      const job = res.data;
+      
+      setProgress(job.progress);
+      
+      if (job.status === 'completed') {
+        setResult(job);
+        setStatus("success");
+        if (onSuccess) onSuccess();
+      } else if (job.status === 'failed') {
+        setErrorMsg(job.message || "Import failed.");
+        setStatus("error");
+      } else {
+        // Keep polling
+        setTimeout(() => pollStatus(id), 2000);
+      }
+    } catch (err) {
+      setErrorMsg("Failed to track import status.");
+      setStatus("error");
+    }
   };
 
   const handleUpload = async () => {
@@ -93,12 +107,12 @@ function UploadPanel({ onSuccess }) {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setResult(res.data);
-      setStatus("success");
-      if (onSuccess) onSuccess();
+      setJobId(res.data.job_id);
+      setStatus("processing");
+      pollStatus(res.data.job_id);
 
     } catch (err) {
-      setErrorMsg(err.response?.data?.error || "Upload failed. Check file format and try again.");
+      setErrorMsg(err.response?.data?.error || "Upload failed.");
       setStatus("error");
     }
   };
@@ -108,7 +122,7 @@ function UploadPanel({ onSuccess }) {
     setStatus("idle");
     setResult(null);
     setErrorMsg("");
-    setShowErrors(false);
+    setProgress(0);
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -118,16 +132,11 @@ function UploadPanel({ onSuccess }) {
       {/* Header */}
       <div className="upload-panel-header">
         <div className="panel-badge">
-          <Icon
-            d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
-            size={20}
-          />
+          <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" size={20} />
         </div>
         <div>
           <div className="panel-title">Employee Excel Import</div>
-          <div className="panel-subtitle">
-            Single file upload — IS_ACTIVE column controls active/inactive status
-          </div>
+          <div className="panel-subtitle">Async processing with real-time progress</div>
         </div>
         {status !== "idle" && (
           <button className="panel-reset" onClick={reset} title="Reset">
@@ -207,7 +216,7 @@ function UploadPanel({ onSuccess }) {
           className={`drop-zone ${dragOver ? "drag-active" : ""}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
+          onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files[0]); }}
           onClick={() => inputRef.current?.click()}
         >
           <input
@@ -228,8 +237,19 @@ function UploadPanel({ onSuccess }) {
         </div>
       )}
 
-      {/* File ready / uploading state */}
-      {(status === "ready" || status === "uploading") && (
+      {/* Progress / Processing state */}
+      {(status === "uploading" || status === "processing") && (
+        <div className="processing-state">
+          <div className="progress-label">
+            {status === "uploading" ? "Uploading file..." : `Processing employees... ${progress}%`}
+          </div>
+          <div className="progress-bar-container">
+            <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
+          </div>
+        </div>
+      )}
+
+      {status === "ready" && (
         <div className="file-ready">
           <div className="file-info">
             <div className="file-icon">
@@ -249,27 +269,7 @@ function UploadPanel({ onSuccess }) {
             </div>
           </div>
 
-          <button
-            className={`upload-btn ${status === "uploading" ? "loading" : ""}`}
-            onClick={handleUpload}
-            disabled={status === "uploading"}
-          >
-            {status === "uploading" ? (
-              <>
-                <span className="spinner" />
-                Uploading & Processing...
-              </>
-            ) : (
-              <>
-                <Icon
-                  d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
-                  size={15}
-                  stroke="white"
-                />
-                Upload & Store to Database
-              </>
-            )}
-          </button>
+          <button className="upload-btn" onClick={handleUpload}>Start Import</button>
         </div>
       )}
 
@@ -282,63 +282,30 @@ function UploadPanel({ onSuccess }) {
               size={22}
               stroke="#16a34a"
             />
-            <span>Import Successful!</span>
+            <span>Import Completed</span>
           </div>
 
           <div className="result-stats">
-            <div className="stat-pill created">
-              <span className="stat-num">{result.created ?? 0}</span>
-              <span className="stat-label">Created</span>
-            </div>
-            <div className="stat-pill updated">
-              <span className="stat-num">{result.updated ?? 0}</span>
-              <span className="stat-label">Updated</span>
-            </div>
-            <div className="stat-pill skipped">
-              <span className="stat-num">{result.skipped ?? 0}</span>
-              <span className="stat-label">Skipped</span>
-            </div>
             <div className="stat-pill total">
-              <span className="stat-num">{result.total_rows ?? 0}</span>
-              <span className="stat-label">Total Rows</span>
+              <span className="stat-num">{result.total_rows}</span>
+              <span className="stat-label">Total</span>
+            </div>
+            <div className="stat-pill success-pill">
+              <span className="stat-num">{result.success_count}</span>
+              <span className="stat-label">Success</span>
+            </div>
+            <div className="stat-pill failed-pill">
+              <span className="stat-num">{result.failed_count}</span>
+              <span className="stat-label">Failed</span>
             </div>
           </div>
 
-          {/* Onboarding success banner */}
-          <div className="credentials-banner">
-            <Icon
-              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-              size={18}
-              stroke="#15803d"
-            />
-            <span>
-              <strong>Employees Invited!</strong> Onboarding emails have been sent to new employees. Ask them to check their inbox to complete setup.
-            </span>
-          </div>
-
-          {/* Row-level errors from backend */}
-          {result.errors && result.errors.length > 0 && (
-            <div className="row-errors">
-              <button
-                className="row-errors-toggle"
-                onClick={() => setShowErrors((v) => !v)}
-              >
-                <Icon
-                  d={showErrors ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}
-                  size={14}
-                />
-                {result.errors.length} row error{result.errors.length > 1 ? "s" : ""} detected
-              </button>
-              {showErrors && (
-                <div className="row-errors-list">
-                  {result.errors.map((e, i) => (
-                    <div key={i} className="row-error-item">
-                      <span className="row-error-loc">Row {e.row} · {e.emp_id || "—"}</span>
-                      <span className="row-error-msg">{e.error}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+          {result.failed_count > 0 && result.error_file_url && (
+            <div className="error-download-zone">
+              <p>Some rows could not be imported. Please review the error report.</p>
+              <a href={result.error_file_url} className="download-btn" target="_blank" rel="noreferrer">
+                Download Error Report (.xlsx)
+              </a>
             </div>
           )}
 
