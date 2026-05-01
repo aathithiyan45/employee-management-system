@@ -47,6 +47,8 @@ class PayrollViewSet(viewsets.ModelViewSet):
         employee_id = self.request.query_params.get('employee_id', None)
         year = self.request.query_params.get('year', None)
 
+        month = self.request.query_params.get('month', None)
+
         if employee_id:
             if employee_id.isdigit():
                 queryset = queryset.filter(employee_id=employee_id)
@@ -54,6 +56,8 @@ class PayrollViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(employee__emp_id=employee_id)
         if year:
             queryset = queryset.filter(month__year=year)
+        if month:
+            queryset = queryset.filter(month=month if '-' in month and len(month) > 7 else month + "-01")
         return queryset
 
     @action(detail=False, methods=['post'])

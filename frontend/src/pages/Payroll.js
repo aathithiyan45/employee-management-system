@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axiosInstance from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
+import "./Payroll.css";
 
 function Payroll() {
   const [payrolls, setPayrolls] = useState([]);
@@ -8,23 +9,37 @@ function Payroll() {
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [count, setCount] = useState(0);
 
   useEffect(() => {
-    fetchPayrolls(month);
-  }, [month]);
+    fetchPayrolls(month, page);
+  }, [month, page]);
 
-  const fetchPayrolls = async (selectedMonth) => {
+  const fetchPayrolls = async (selectedMonth, currentPage) => {
+    setLoading(true);
     try {
-      const year = selectedMonth.split("-")[0];
-      // We can fetch all and filter, or use our analytics endpoint or just GET /payroll/?year=YYYY
-      const res = await axiosInstance.get(`/payroll/?year=${year}`);
+      const res = await axiosInstance.get(`/payroll/?month=${selectedMonth}&page=${currentPage}`);
       
-      // Filter by exactly the month we selected
-      const allPayrolls = res.data.results || res.data;
-      const filtered = allPayrolls.filter(p => p.month.startsWith(selectedMonth));
-      setPayrolls(filtered);
+      if (res.data.results) {
+        setPayrolls(res.data.results);
+        setCount(res.data.count);
+        setTotalPages(Math.ceil(res.data.count / 15));
+      } else {
+        setPayrolls(res.data);
+        setCount(res.data.length);
+        setTotalPages(1);
+      }
     } catch (err) {
       console.error("Failed to fetch payrolls", err);
+      if (err.response?.status === 404 && currentPage > 1) {
+        setPage(1);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -33,12 +48,13 @@ function Payroll() {
     setError("");
     setSuccess("");
     try {
-      const res = await axiosInstance.post("/payroll/generate/", { month });
-      setSuccess("Payroll generated successfully!");
-      setPayrolls(res.data.data || []);
+      await axiosInstance.post("/payroll/generate/", { month });
+      setSuccess("Payroll generated successfully for " + month);
+      setPage(1);
+      fetchPayrolls(month, 1);
     } catch (err) {
       console.error("Failed to generate payroll", err);
-      setError("Failed to generate payroll. Please check if the month format is correct.");
+      setError("Failed to generate payroll. Please check connection.");
     } finally {
       setLoading(false);
     }
@@ -50,6 +66,7 @@ function Payroll() {
       await axiosInstance.patch(`/payroll/${id}/`, { status: newStatus });
       setPayrolls(payrolls.map(p => p.id === id ? { ...p, status: newStatus } : p));
       setSuccess(`Payroll marked as ${newStatus}!`);
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
       console.error("Failed to update status", err);
       setError("Failed to update status.");
@@ -59,70 +76,86 @@ function Payroll() {
   return (
     <div className="dashboard-container">
       <Sidebar />
-      <main className="dashboard-main">
-        <header className="dashboard-header">
-          <h1>Monthly Payroll</h1>
-        </header>
+      <main className="dashboard-main payroll-page">
+        <div className="payroll-header">
+          <div className="header-left">
+            <h1>Monthly Payroll</h1>
+          </div>
+        </div>
 
         <section className="dashboard-content">
-          {error && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">{success}</div>}
+          {error && <div className="payroll-alert payroll-alert-error">{error}</div>}
+          {success && <div className="payroll-alert payroll-alert-success">{success}</div>}
 
-          <div className="card" style={{ marginBottom: "20px" }}>
-            <h2>Generate Payroll</h2>
-            <div style={{ display: "flex", gap: "10px", alignItems: "flex-end" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                <label>Month</label>
+          {/* Generation Section */}
+            <div className="generation-form">
+              <div className="form-group">
+                <label>Select Month</label>
                 <input 
                   type="month" 
                   value={month} 
-                  onChange={(e) => setMonth(e.target.value)} 
-                  className="form-input" 
+                  onChange={(e) => {
+                    setMonth(e.target.value);
+                    setPage(1);
+                  }} 
+                  className="payroll-input" 
                 />
               </div>
-              <button 
-                className="btn btn-primary" 
-                onClick={handleGenerate} 
-                disabled={loading || !month}
-                style={{ height: "42px" }}
-              >
-                {loading ? "Generating..." : "Generate Payroll"}
-              </button>
+              <div className="form-group">
+                <label>&nbsp;</label>
+                <button 
+                  className="btn-save" 
+                  onClick={handleGenerate} 
+                  disabled={loading || !month}
+                  style={{ height: "38px", padding: "0 20px" }}
+                >
+                  {loading ? "Processing..." : "Generate Payroll"}
+                </button>
+              </div>
             </div>
+
+          {/* Stats Bar */}
+          <div className="stats-bar">
+            <span className="stats-text">
+              Showing {payrolls.length} of {count} payroll records for {month}
+            </span>
           </div>
 
-          <div className="card">
-            <h2>Payroll Records ({month})</h2>
-            <table className="data-table">
+          {/* Table */}
+          <div className="table-wrapper">
+            <table className="payroll-table">
               <thead>
                 <tr>
-                  <th>Employee ID</th>
-                  <th>Name</th>
-                  <th>Total Hours</th>
-                  <th>Salary ($)</th>
-                  <th>Status</th>
-                  <th>Action</th>
+                  <th width="15%" className="text-left">EMP ID</th>
+                  <th width="25%" className="text-left">Name</th>
+                  <th width="15%" className="text-center">Total Hours</th>
+                  <th width="15%" className="text-center">Net Salary</th>
+                  <th width="15%" className="text-center">Status</th>
+                  <th width="15%" className="text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {payrolls.length === 0 ? (
-                  <tr><td colSpan="6" style={{ textAlign: "center" }}>No payroll records found for this month.</td></tr>
+                {loading && payrolls.length === 0 ? (
+                   <tr><td colSpan="6" style={{ textAlign: "center", padding: "40px" }}>Loading records...</td></tr>
+                ) : payrolls.length === 0 ? (
+                  <tr><td colSpan="6" style={{ textAlign: "center", padding: "40px" }}>No payroll records found.</td></tr>
                 ) : (
-                  payrolls.map(p => (
-                    <tr key={p.id}>
-                      <td>{p.employee_id_str}</td>
-                      <td>{p.employee_name}</td>
-                      <td>{p.total_hours}</td>
-                      <td>${parseFloat(p.total_salary).toFixed(2)}</td>
-                      <td>
-                        <span className={`status-badge status-${p.status}`}>
+                  payrolls.map((p, index) => (
+                    <tr key={p.id} className={index % 2 === 0 ? "even-row" : "odd-row"}>
+                      <td className="text-left">
+                        <span className="emp-id-badge">{p.employee_id_str}</span>
+                      </td>
+                      <td className="text-left"><strong>{p.employee_name}</strong></td>
+                      <td className="text-center">{p.total_hours}</td>
+                      <td className="text-center"><strong>${parseFloat(p.total_salary).toFixed(2)}</strong></td>
+                      <td className="text-center">
+                        <span className={`status-pill ${p.status}`}>
                           {p.status}
                         </span>
                       </td>
-                      <td>
+                      <td className="text-center">
                         <button 
-                          className={`btn ${p.status === "pending" ? "btn-success" : "btn-secondary"}`}
-                          style={{ padding: "4px 8px", fontSize: "0.85rem" }}
+                          className={`action-btn ${p.status === "pending" ? "pay" : "revert"}`}
                           onClick={() => handleStatusChange(p.id, p.status)}
                         >
                           {p.status === "pending" ? "Mark Paid" : "Mark Pending"}
@@ -134,6 +167,27 @@ function Payroll() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <button 
+                className="page-btn" 
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+              >
+                ‹ Prev
+              </button>
+              <span className="page-info">Page {page} of {totalPages}</span>
+              <button 
+                className="page-btn" 
+                disabled={page === totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Next ›
+              </button>
+            </div>
+          )}
         </section>
       </main>
     </div>
