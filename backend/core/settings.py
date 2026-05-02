@@ -91,9 +91,11 @@ CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"https://.*\.vercel\.app",
 ]
-
-CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
-
+CORS_EXPOSE_HEADERS = ["Content-Type", "Authorization"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://employee-management-system-6sgf.vercel.app",
+    "https://employee-management-system-6sgf-72nqown13.vercel.app",
+]
 # CSRF/Cookie Settings
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = False  # Must be False so frontend JS can read it for X-CSRFToken header
