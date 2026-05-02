@@ -19,6 +19,14 @@ from .views import (
     update_employee,
 
 )
+from .analytics_views import (
+    employee_analytics_summary,
+    employee_by_division,
+    employee_by_nationality,
+    employee_by_designation,
+    employee_hiring_trend,
+    employee_expiry_alerts,
+)
 
 urlpatterns = [
 
@@ -40,5 +48,13 @@ urlpatterns = [
     path('employees/',                         employee_list),
     path('employees/<str:emp_id>/',            employee_detail),
     path('employees/<str:emp_id>/update/',     update_employee),
+
+    # ── Analytics ───────────────────────────────
+    path('employees/analytics/summary/',    employee_analytics_summary),
+    path('employees/analytics/division/',   employee_by_division),
+    path('employees/analytics/nationality/',employee_by_nationality),
+    path('employees/analytics/designation/',employee_by_designation),
+    path('employees/analytics/hiring/',     employee_hiring_trend),
+    path('employees/analytics/expiry/',     employee_expiry_alerts),
 
 ]

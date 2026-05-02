@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { logout } from "../axiosInstance";
 
@@ -10,6 +11,7 @@ const Icon = ({ d, size = 17 }) => (
 );
 
 // ── Nav link definitions per role ─────────────────────────
+// ... (keep NAV definitions same)
 const ADMIN_NAV = [
   {
     label: "Main",
@@ -21,6 +23,7 @@ const ADMIN_NAV = [
       { path: "/documents", label: "Documents",       icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h4" },
       { path: "/worklog",   label: "WorkLog",         icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
       { path: "/payroll",   label: "Payroll",         icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
+      { path: "/invoices",  label: "Invoices",        icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8" },
       { path: "/audit-logs",label: "Audit Logs",     icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v4m0 4h.01" },
     ],
   },
@@ -44,6 +47,7 @@ const HR_NAV = [
       { path: "/employees",    label: "Employees",       icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
       { path: "/worklog",      label: "WorkLog",         icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
       { path: "/payroll",      label: "Payroll",         icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
+      { path: "/invoices",     label: "Invoices",        icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8" },
     ],
   },
   {
@@ -74,6 +78,7 @@ const SUBTITLE_BY_ROLE = { admin: "Admin Dashboard", hr: "HR Portal", employee: 
 function Sidebar() {
   const navigate  = useNavigate();
   const location  = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
   const user      = JSON.parse(localStorage.getItem("user") || "{}");
   const role      = user?.role || "employee";
   const initials  = (user?.username || "U").slice(0, 2).toUpperCase();
@@ -82,67 +87,90 @@ function Sidebar() {
 
   const handleLogout = () => logout();
 
+  const handleNav = (path) => {
+    navigate(path);
+    setIsOpen(false);
+  };
+
   return (
-    <aside className="sidebar">
-      {/* Brand */}
-      <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+    <>
+      {/* Mobile Toggle Button */}
+      <button className={`sidebar-toggle${isOpen ? " open" : ""}`} onClick={() => setIsOpen(!isOpen)}>
+        {isOpen ? (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
           </svg>
-        </div>
-        <div className="sidebar-brand-name">HR <span style={{ color: "var(--teal-400)" }}>Portal</span></div>
-        <div className="sidebar-brand-sub">{subtitle}</div>
-      </div>
+        ) : (
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        )}
+      </button>
 
-      {/* Nav */}
-      <nav className="sidebar-nav">
-        {sections.map(section => (
-          <div key={section.label}>
-            <div className="sidebar-section-label">{section.label}</div>
-            {section.links.map(link => {
-              const active = location.pathname === link.path ||
-                (link.path !== "/" && location.pathname.startsWith(link.path));
-              return (
-                <button
-                  key={link.path}
-                  className={`sidebar-link${active ? " active" : ""}`}
-                  onClick={() => navigate(link.path)}
-                >
-                  <Icon d={link.icon} />
-                  {link.label}
-                </button>
-              );
-            })}
+      {/* Backdrop for mobile */}
+      {isOpen && <div className="sidebar-backdrop" onClick={() => setIsOpen(false)} />}
+
+      <aside className={`sidebar ${isOpen ? "open" : ""}`}>
+        {/* Brand */}
+        <div className="sidebar-brand">
+          <div className="sidebar-brand-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
           </div>
-        ))}
-      </nav>
+          <div className="sidebar-brand-name">HR <span style={{ color: "var(--teal-400)" }}>Portal</span></div>
+          <div className="sidebar-brand-sub">{subtitle}</div>
+        </div>
 
-      {/* Footer */}
-      <div className="sidebar-footer">
-        <div className="sidebar-user">
-          <div className="sidebar-user-avatar">{initials}</div>
-          <div className="sidebar-user-info">
-            <div className="sidebar-user-name">{user?.username || "User"}</div>
-            <div className="sidebar-user-role">
-              {role.charAt(0).toUpperCase() + role.slice(1)}
+        {/* Nav */}
+        <nav className="sidebar-nav">
+          {sections.map(section => (
+            <div key={section.label}>
+              <div className="sidebar-section-label">{section.label}</div>
+              {section.links.map(link => {
+                const active = location.pathname === link.path ||
+                  (link.path !== "/" && location.pathname.startsWith(link.path));
+                return (
+                  <button
+                    key={link.path}
+                    className={`sidebar-link${active ? " active" : ""}`}
+                    onClick={() => handleNav(link.path)}
+                  >
+                    <Icon d={link.icon} />
+                    {link.label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="sidebar-user-avatar">{initials}</div>
+            <div className="sidebar-user-info">
+              <div className="sidebar-user-name">{user?.username || "User"}</div>
+              <div className="sidebar-user-role">
+                {role.charAt(0).toUpperCase() + role.slice(1)}
+              </div>
             </div>
           </div>
+          <button className="sidebar-logout" onClick={handleLogout}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign Out
+          </button>
         </div>
-        <button className="sidebar-logout" onClick={handleLogout}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          Sign Out
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 

@@ -1,13 +1,14 @@
 from django.conf import settings
 from django.contrib.auth import authenticate
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-from .auth import VersionedRefreshToken
+from .auth import VersionedRefreshToken, VersionedJWTAuthentication
+from rest_framework.authentication import SessionAuthentication
 
 from apps.employees.models import User
 from django.contrib.auth.tokens import default_token_generator
@@ -105,8 +106,8 @@ def login_view(request):
             key='refresh_token',
             value=str(refresh),
             httponly=True,
-            secure=not settings.DEBUG,  # True in production
-            samesite='Lax',
+            secure=True,   # Required for samesite='None'
+            samesite='None', # Required for Vercel -> Render cross-domain
             path='/api/token/refresh/',
         )
         return response
@@ -125,6 +126,7 @@ def login_view(request):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+@authentication_classes([VersionedJWTAuthentication, SessionAuthentication])
 def logout_view(request):
     """
     Invalidate the supplied refresh token so it cannot be used to obtain

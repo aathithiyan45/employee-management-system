@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'apps.documents',
     'apps.analytics',
     'apps.payroll',
+    'apps.invoices',
 ]
 
 
@@ -63,13 +64,25 @@ MIDDLEWARE = [
     'core.middleware.CSPMiddleware',
 ]
 
+# Serving static files on Render/Production only
+if not DEBUG:
+    # WhiteNoise should be right after SecurityMiddleware
+    MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
+
+
 CSRF_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = False  # Must be False so frontend JS can read it for X-CSRFToken header
 CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_TRUSTED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000,http://127.0.0.1:3000').split(',')
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:3000,http://127.0.0.1:3000',
+    cast=Csv()
+)
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF_TRUSTED_ORIGINS MUST include the scheme (http:// or https://)
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+
 
 # ─────────────────────────────────────────────
 # SECURITY - CLICKJACKING & CSP
@@ -85,12 +98,7 @@ X_FRAME_OPTIONS = 'DENY'
 # NEVER use CORS_ALLOW_ALL_ORIGINS = True in production
 # ─────────────────────────────────────────────
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000',
-    cast=Csv()
-)
-CORS_ALLOW_CREDENTIALS = True
+
 
 
 # ─────────────────────────────────────────────
@@ -127,6 +135,9 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD', default=''),
         'HOST':     config('DB_HOST',     default='localhost'),
         'PORT':     config('DB_PORT',     default='5432'),
+        'OPTIONS': {
+            'sslmode': 'require' if not DEBUG else 'prefer',
+        }
     }
 }
 
@@ -168,6 +179,14 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+if not DEBUG:
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -188,7 +207,7 @@ REST_FRAMEWORK = {
         'apps.accounts.auth.VersionedJWTAuthentication',
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 15,
+    'PAGE_SIZE': 20,
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -283,6 +302,7 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 # ─────────────────────────────────────────────
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_BROWSER_XSS_FILTER = True

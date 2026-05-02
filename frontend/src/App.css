@@ -62,6 +62,37 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── Global Layout ── */
+.dashboard-container {
+  display: flex;
+  min-height: 100vh;
+}
+
+.dashboard-main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--grey-100);
+  width: calc(100% - var(--sidebar-w));
+}
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: linear-gradient(180deg, var(--blue-900) 0%, var(--blue-800) 100%);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+
 a { text-decoration: none; color: inherit; }
 
 button {
@@ -79,3 +110,146 @@ input, select, textarea {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--grey-300); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--grey-400); }
+
+/* ════════════════════════════════
+   GLOBAL RESPONSIVENESS FIXES
+════════════════════════════════ */
+
+/* ── Active (Pressed) States for touch ── */
+button:active:not(:disabled), 
+.action-btn:active:not(:disabled),
+.sidebar-link:active {
+  transform: scale(0.98);
+  filter: brightness(0.9);
+}
+
+/* ── Tablet & Small Desktop (Hiding sidebar by default) ── */
+@media (max-width: 1024px) {
+  .dashboard-main, .dashboard-container main, .dashboard-shell main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+  .dashboard-content, .employee-page, .worklog-page, .payroll-page, .invoices-page, .hr-dashboard-page {
+    padding: 12px !important;
+  }
+}
+
+/* ── Mobile & Tablet Layout Stacking ── */
+@media (max-width: 768px) {
+  /* Tables */
+  .table-wrapper, .lm-table-wrap, .invoices-table-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: var(--radius-md) !important;
+    margin-top: 10px;
+  }
+  .table-wrapper table, .lm-table, .worklog-table, .payroll-table, .invoices-table {
+    min-width: 800px !important;
+  }
+
+  /* Grid Stacking */
+  .cards-grid, .lm-stats-strip, .hr-stats-grid, .lb-rings-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* Form & Filter Bars */
+  .filters, .lm-filters, .table-filters-bar, .invoices-top-bar, .worklog-filters, .generation-form, .entry-form {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+
+  /* Make sub-filter groups compact */
+  .filter-group.secondary, .filter-group.tertiary {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .filter-group.date-range {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 12px !important;
+  }
+
+  .filters-right, .header-right, .header-left, .topbar-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    gap: 8px !important;
+  }
+
+  /* Elements Full Width */
+  input, select, textarea, .search-input, .pa-year-select, .pa-emp-select {
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 40px !important; /* Standard height for touch */
+  }
+
+  /* Buttons Full Width & Touch Padding */
+  .btn-save, .action-btn, .page-btn, .back-button, .lm-btn, .hr-btn, .topbar-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px !important;
+    min-height: 42px !important;
+  }
+
+  /* Specific Card/Row Stacking */
+  .hr-request-card {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding: 12px !important;
+  }
+  .hr-request-actions {
+    width: 100% !important;
+    margin-top: 8px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  /* Typography Scale */
+  h1 { font-size: 1.35rem !important; }
+  h2 { font-size: 1.15rem !important; }
+}
+
+@media (max-width: 480px) {
+  /* Ultra-small screen adjustments */
+  .filter-group.secondary, .filter-group.tertiary {
+    grid-template-columns: 1fr !important; /* Single column on very small screens */
+  }
+  
+  .topbar-title, .employee-header h1, .worklog-header h1, .payroll-header h1 {
+    font-size: 16px !important;
+  }
+
+  .header-left {
+    flex-direction: row !important; /* Keep back button and title on same row if possible */
+    align-items: center !important;
+    flex-wrap: wrap;
+  }
+}
+
+/* ── Modal Constraints ── */
+@media (max-width: 600px) {
+  .modal-content, .edit-modal, .lm-modal, .hr-modal {
+    width: 96% !important;
+    max-height: 85vh !important;
+    margin: 10px auto !important;
+    border-radius: var(--radius-lg) !important;
+  }
+  .modal-body, .lm-modal-body, .hr-modal-body {
+    padding: 16px !important;
+    overflow-y: auto !important;
+  }
+  .modal-footer, .lm-modal-footer, .hr-modal-footer {
+    padding: 12px !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+}

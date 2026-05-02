@@ -454,7 +454,11 @@ def employee_list(request):
 
     if search:
         employees = employees.filter(
-            Q(emp_id__icontains=search) | Q(name__icontains=search)
+            Q(emp_id__icontains=search) | 
+            Q(name__icontains=search) |
+            Q(work_permit_no__icontains=search) |
+            Q(fin_no__icontains=search) |
+            Q(ssic_gt_sn__icontains=search)
         )
     if division and division != "all":
         employees = employees.filter(division__name=division)

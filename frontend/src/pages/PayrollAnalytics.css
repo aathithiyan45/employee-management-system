@@ -1,0 +1,288 @@
+/* ── PayrollAnalytics.css ─────────────────────────────────────────────────── */
+
+/* Page shell */
+.pa-page {
+  padding: 28px 32px;
+  background: var(--grey-100);
+  min-height: 100vh;
+}
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+.pa-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.pa-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--grey-900);
+  letter-spacing: -0.4px;
+  margin: 0 0 3px 0;
+}
+
+.pa-subtitle {
+  font-size: 12.5px;
+  color: var(--grey-400);
+  font-weight: 400;
+  margin: 0;
+}
+
+.pa-year-select {
+  padding: 7px 12px;
+  border: 1.5px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--grey-800);
+  background: var(--white);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.pa-year-select:focus { border-color: var(--blue-500); }
+
+/* ── Loading & Empty ───────────────────────────────────────────────────────── */
+.pa-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 320px;
+  color: var(--grey-400);
+  font-size: 14px;
+}
+
+.pa-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--grey-200);
+  border-top-color: var(--blue-500);
+  border-radius: 50%;
+  animation: pa-spin 0.8s linear infinite;
+}
+@keyframes pa-spin { to { transform: rotate(360deg); } }
+
+.pa-empty {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-lg);
+  padding: 60px 20px;
+  text-align: center;
+}
+.pa-empty-icon { font-size: 36px; margin-bottom: 12px; }
+.pa-empty h3 { font-size: 16px; color: var(--grey-800); margin-bottom: 6px; }
+.pa-empty p  { font-size: 13px; color: var(--grey-400); }
+
+/* ── Content wrapper ───────────────────────────────────────────────────────── */
+.pa-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── KPI Row ───────────────────────────────────────────────────────────────── */
+.pa-kpi-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pa-kpi {
+  flex: 1;
+  min-width: 130px;
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.pa-kpi:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+
+.pa-kpi::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 99px 0 0 99px;
+}
+
+.pa-kpi-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.pa-kpi-body { min-width: 0; }
+
+.pa-kpi-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--grey-900);
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pa-kpi-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--grey-400);
+  margin-top: 3px;
+}
+
+.pa-kpi-sub {
+  font-size: 11px;
+  color: var(--grey-400);
+  margin-top: 2px;
+  font-family: var(--mono);
+}
+
+/* ── Grid layouts ──────────────────────────────────────────────────────────── */
+.pa-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.pa-grid-7-5 { grid-template-columns: 7fr 5fr; }
+.pa-grid-5-7 { grid-template-columns: 5fr 7fr; }
+.pa-grid-6-6 { grid-template-columns: 1fr 1fr; }
+
+/* ── Chart Card ────────────────────────────────────────────────────────────── */
+.pa-card {
+  background: var(--white);
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px 20px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s;
+}
+.pa-card:hover { box-shadow: var(--shadow-md); }
+
+.pa-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.pa-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--grey-800);
+  letter-spacing: -0.2px;
+}
+
+/* ── Doughnut layout ───────────────────────────────────────────────────────── */
+.pa-donut-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+}
+
+.pa-donut-chart {
+  flex-shrink: 0;
+  width: 140px;
+  height: 140px;
+  position: relative;
+}
+
+.pa-donut-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  overflow: hidden;
+}
+
+.pa-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.pa-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pa-legend-name {
+  font-size: 11.5px;
+  color: var(--grey-700, #4a5568);
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pa-legend-val {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--grey-500, #718096);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* ── Employee select ───────────────────────────────────────────────────────── */
+.pa-emp-select {
+  padding: 5px 10px;
+  border: 1.5px solid var(--grey-200);
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--grey-700, #4a5568);
+  background: var(--grey-50);
+  outline: none;
+  cursor: pointer;
+  max-width: 200px;
+  transition: border-color 0.2s;
+}
+.pa-emp-select:focus { border-color: var(--blue-500); }
+
+/* ── Placeholder ───────────────────────────────────────────────────────────── */
+.pa-placeholder {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--grey-400);
+  font-style: italic;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .pa-grid-7-5,
+  .pa-grid-5-7,
+  .pa-grid-6-6 { grid-template-columns: 1fr; }
+
+  .pa-kpi { min-width: 140px; }
+}
+
+@media (max-width: 768px) {
+  .pa-page { padding: 20px 16px; }
+  .pa-kpi-row { gap: 8px; }
+  .pa-kpi { padding: 12px 14px; }
+  .pa-kpi-value { font-size: 16px; }
+}

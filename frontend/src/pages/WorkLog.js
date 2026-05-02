@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axiosInstance from "../axiosInstance";
+import api from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
 import "./WorkLog.css";
 
@@ -16,28 +16,39 @@ function WorkLog() {
     hours: ""
   });
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchWorkLogs();
-  }, []);
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterEmp, setFilterEmp] = useState("");
 
-  const fetchEmployees = async () => {
+  const fetchEmployees = React.useCallback(async () => {
     try {
-      const res = await axiosInstance.get("/employees/?is_active=true&page_size=1000");
+      const res = await api.get("/employees/?is_active=true&page_size=1000");
       setEmployees(res.data.results || res.data);
     } catch (err) {
       console.error("Failed to fetch employees", err);
     }
-  };
+  }, []);
 
-  const fetchWorkLogs = async () => {
+  const fetchWorkLogs = React.useCallback(async () => {
     try {
-      const res = await axiosInstance.get("/worklog/");
+      let url = "/worklog/";
+      const params = new URLSearchParams();
+      if (filterMonth) params.append("month", filterMonth);
+      if (filterEmp)   params.append("employee", filterEmp);
+      
+      const res = await api.get(`${url}?${params.toString()}`);
       setWorkLogs(res.data.results || res.data);
     } catch (err) {
       console.error("Failed to fetch worklogs", err);
     }
-  };
+  }, [filterMonth, filterEmp]);
+
+  useEffect(() => {
+    fetchEmployees();
+  }, [fetchEmployees]);
+
+  useEffect(() => {
+    fetchWorkLogs();
+  }, [fetchWorkLogs]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -49,7 +60,7 @@ function WorkLog() {
     setError("");
     setSuccess("");
     try {
-      await axiosInstance.post("/worklog/", formData);
+      await api.post("/worklog/", formData);
       setFormData({ ...formData, hours: "" });
       setSuccess("WorkLog added successfully!");
       fetchWorkLogs();
@@ -98,16 +109,47 @@ function WorkLog() {
               </div>
               <div className="form-group">
                 <label>&nbsp;</label>
-                <button type="submit" className="btn-save" disabled={loading} style={{ height: "38px", padding: "0 20px" }}>
+                <button type="submit" className="btn-save" disabled={loading}>
                   {loading ? "Adding..." : "Add Hours"}
                 </button>
               </div>
             </form>
           </div>
 
-          <div className="stats-bar">
+          <div className="worklog-filters">
+            <div className="filter-group">
+              <label>Filter by Month:</label>
+              <input 
+                type="month" 
+                value={filterMonth} 
+                onChange={(e) => setFilterMonth(e.target.value)} 
+                className="worklog-input"
+              />
+            </div>
+            <div className="filter-group">
+              <label>Filter by Employee:</label>
+              <select 
+                value={filterEmp} 
+                onChange={(e) => setFilterEmp(e.target.value)} 
+                className="worklog-select"
+              >
+                <option value="">All Employees</option>
+                {employees.map(emp => (
+                  <option key={emp.emp_id} value={emp.emp_id}>{emp.emp_id} - {emp.name}</option>
+                ))}
+              </select>
+            </div>
+            {(filterMonth || filterEmp) && (
+              <button 
+                className="btn-clear" 
+                onClick={() => { setFilterMonth(""); setFilterEmp(""); }}
+                style={{ background: "transparent", color: "var(--grey-600)", fontWeight: "600", fontSize: "13px", border: "none", cursor: "pointer" }}
+              >
+                Clear Filters
+              </button>
+            )}
             <span className="stats-text">
-              Showing {workLogs.length} recent worklog entries
+              Showing {workLogs.length} matching entries
             </span>
           </div>
 

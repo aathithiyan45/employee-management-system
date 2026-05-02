@@ -623,8 +623,6 @@
     transform: rotate(360deg);
   }
 }
-/* ── Append these to Dashboard.css ───────────────────────── */
-
 /* ── Toast notification ─────────────────────────────────── */
 .toast {
   position: fixed;
@@ -681,4 +679,109 @@
 .topbar-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+/* ════════════════════════════════
+   RESPONSIVENESS (MOBILE & TABLET)
+════════════════════════════════ */
+
+/* Mobile Toggle & Backdrop (Hidden by default) */
+.sidebar-toggle {
+  display: none;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1100; /* Higher than sidebar */
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--blue-700);
+  color: white;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-toggle.open {
+  background: rgba(255,255,255,0.1);
+  color: white;
+  border-color: rgba(255,255,255,0.2);
+  left: 190px; /* Position it near the edge of the open sidebar */
+  box-shadow: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  animation: fade-in 0.3s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 1023px) {
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-xl);
+    width: 240px;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-toggle {
+    display: flex;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+  }
+
+  .dashboard-main {
+    margin-left: 0 !important;
+  }
+
+  .dashboard-topbar {
+    padding: 0 16px 0 60px; /* Make room for toggle */
+  }
+
+  .dashboard-content {
+    padding: 16px;
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr; /* Stack cards */
+  }
+
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar-title {
+    font-size: 15px;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .topbar-btn span {
+    display: none; /* Hide button text on very small screens */
+  }
+
+  .dashboard-greeting h2 {
+    font-size: 20px;
+  }
 }

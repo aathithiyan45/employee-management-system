@@ -57,7 +57,6 @@ def document_list_upload(request, emp_id):
                 'doc_type_label':d.get_doc_type_display(),
                 'label':         d.label or d.get_doc_type_display(),
                 'file_name':     os.path.basename(d.file.name),
-                'file_path':     d.file.name,   # relative path under MEDIA_ROOT — used for preview URL
                 'expiry_date':   d.expiry_date,
                 'days_left':     days_left,
                 'is_expiring_soon': d.is_expiring_soon,
@@ -169,7 +168,7 @@ def document_download(request, pk):
         return Response({'error': 'File not found on server.'}, status=404)
 
     file_name = os.path.basename(doc.file.name)
-    response  = FileResponse(open(doc.file.path, 'rb'), as_attachment=True, filename=file_name)
+    response  = FileResponse(doc.file.open('rb'), as_attachment=True, filename=file_name)
     
     # Log the download event
     from apps.analytics.utils import log_event
@@ -264,7 +263,7 @@ def document_preview(request, pk):
         return Response({'error': 'File not found on server.'}, status=404)
 
     # Use 'inline' to allow browser rendering (like PDF preview)
-    response = FileResponse(open(doc.file.path, 'rb'), content_type=None)
+    response = FileResponse(doc.file.open('rb'))
     response['Content-Disposition'] = 'inline'
     
     # Log the view event

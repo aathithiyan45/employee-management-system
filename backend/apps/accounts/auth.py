@@ -2,6 +2,7 @@ from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, AuthenticationFailed
 from django.conf import settings
+from rest_framework.authentication import SessionAuthentication
 
 # ── TOKEN CLASSES ───────────────────────────────────────────
 
@@ -63,6 +64,7 @@ def get_versioned_refresh_view():
             if not refresh_token:
                 raise InvalidToken("Secure session cookie missing. Please login again.")
 
+            # Hardening: Exclusively use the cookie, ignore any token in request body
             attrs['refresh'] = refresh_token
             data = super().validate(attrs)
             
@@ -78,6 +80,7 @@ def get_versioned_refresh_view():
 
     class VersionedTokenRefreshView(TokenRefreshView):
         serializer_class = VersionedTokenRefreshSerializer
+        authentication_classes = [SessionAuthentication]
 
         def post(self, request, *args, **kwargs):
             response = super().post(request, *args, **kwargs)
@@ -88,8 +91,8 @@ def get_versioned_refresh_view():
                     key='refresh_token',
                     value=new_refresh,
                     httponly=True,
-                    secure=not settings.DEBUG,
-                    samesite='Lax',
+                    secure=True,   # Required for samesite='None'
+                    samesite='None', # Required for cross-domain
                     path='/api/token/refresh/',
                 )
             return response

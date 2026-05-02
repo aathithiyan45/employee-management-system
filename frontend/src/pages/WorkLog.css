@@ -2,13 +2,15 @@
 
 .worklog-page {
   padding: 32px;
+  /* Removed margin: 0 auto to prevent sidebar overlap */
 }
+
 
 .worklog-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
   flex-wrap: wrap;
   gap: 16px;
 }
@@ -20,33 +22,41 @@
 }
 
 .worklog-header h1 {
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   color: var(--grey-900);
-  letter-spacing: -0.4px;
+  letter-spacing: -0.6px;
   margin: 0;
 }
 
 /* Form Section */
 .worklog-form-container {
   background: var(--white);
-  padding: 24px;
+  padding: 28px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--grey-200);
   box-shadow: var(--shadow-sm);
-  margin-bottom: 24px;
+  margin-bottom: 32px;
+  transition: box-shadow 0.3s ease;
+}
+
+.worklog-form-container:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .worklog-form-container h2 {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--grey-800);
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .worklog-form {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   align-items: flex-end;
   flex-wrap: wrap;
 }
@@ -54,45 +64,81 @@
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .form-group label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--grey-600);
+  margin-left: 2px;
 }
 
 .worklog-input, .worklog-select {
-  padding: 9px 14px;
+  padding: 10px 16px;
   border: 1.5px solid var(--grey-200);
   border-radius: var(--radius-md);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--grey-800);
   background: var(--white);
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 180px;
+}
+
+/* Specific widths for inputs */
+input[name="hours"].worklog-input {
+  min-width: 100px;
+  max-width: 120px;
+}
+
+input[type="date"].worklog-input,
+input[type="month"].worklog-input {
+  min-width: 160px;
 }
 
 .worklog-input:focus, .worklog-select:focus {
   outline: none;
   border-color: var(--blue-600);
-  box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.10);
+  box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.12);
+  transform: translateY(-1px);
 }
 
-/* Stats bar */
-.stats-bar {
-  margin-bottom: 16px;
-  padding: 8px 16px;
-  background: var(--blue-50);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--blue-100);
+/* Stats bar / Filters */
+.worklog-filters {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--grey-200);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+}
+
+.worklog-filters .filter-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.worklog-filters .filter-group label {
+  white-space: nowrap;
+  font-size: 14px;
+  margin-bottom: 0;
 }
 
 .stats-text {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--blue-700);
+  margin-left: auto;
+  background: var(--blue-50);
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--blue-100);
 }
 
 /* Table */
@@ -116,55 +162,112 @@
 }
 
 .worklog-table thead th {
-  padding: 13px 18px;
-  font-size: 11.5px;
+  padding: 16px 20px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.7px;
-  color: var(--grey-400);
+  letter-spacing: 1px;
+  color: var(--grey-600); /* Darkened for better readability */
   white-space: nowrap;
   text-align: left;
 }
 
 .worklog-table tbody tr {
   border-bottom: 1px solid var(--grey-100);
-  transition: all 0.15s ease;
+  transition: background 0.2s ease;
 }
 
 .worklog-table tbody tr:hover {
-  background: #f5f7fa;
+  background: #f8fafc;
 }
 
 .worklog-table tbody td {
-  padding: 13px 18px;
-  font-size: 13.5px;
+  padding: 16px 20px;
+  font-size: 14px;
   color: var(--grey-800);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--grey-100);
+}
+
+.worklog-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .emp-id-badge {
   display: inline-block;
-  padding: 4px 10px;
-  background: linear-gradient(135deg, var(--blue-50), var(--blue-100));
-  color: var(--blue-700);
-  border-radius: 99px;
+  padding: 5px 12px;
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 6px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   font-family: var(--mono);
-  border: 1px solid var(--blue-200);
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
 }
 
-.worklog-alert {
-  padding: 12px 20px;
-  border-radius: var(--radius-md);
-  margin-bottom: 20px;
-  font-size: 14px;
-  font-weight: 500;
+.worklog-table tr:hover .emp-id-badge {
+  background: var(--blue-50);
+  color: var(--blue-700);
+  border-color: var(--blue-200);
 }
-.worklog-alert-error { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(198, 40, 40, 0.2); }
-.worklog-alert-success { background: var(--success-bg); color: var(--success); border: 1px solid rgba(46, 125, 50, 0.2); }
+
+
+.worklog-alert {
+  padding: 14px 24px;
+  border-radius: var(--radius-md);
+  margin-bottom: 24px;
+  font-size: 15px;
+  font-weight: 600;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.worklog-alert-error { 
+  background: #fef2f2; 
+  color: #991b1b; 
+  border: 1px solid #fee2e2; 
+}
+
+.worklog-alert-success { 
+  background: #f0fdf4; 
+  color: #166534; 
+  border: 1px solid #dcfce7; 
+}
 
 .text-left { text-align: left !important; }
 .text-center { text-align: center !important; }
 .text-right { text-align: right !important; }
+
+/* Button override for WorkLog */
+.worklog-form .btn-save {
+  height: 42px !important;
+  background: var(--blue-600);
+  color: white;
+  padding: 0 24px !important;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.worklog-form .btn-save:hover:not(:disabled) {
+  background: var(--blue-700);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.worklog-form .btn-save:active:not(:disabled) {
+  transform: translateY(0);
+}
+
 
 

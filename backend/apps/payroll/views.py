@@ -143,68 +143,79 @@ class PayrollViewSet(viewsets.ModelViewSet):
         POST /payroll/generate/
         Body: { "month": "YYYY-MM" }
 
-        Iterates over all active employees, sums their WorkLog hours for
-        the given month, and creates/updates a Payroll record for each.
-        Idempotent — safe to call multiple times for the same month.
+        Optimized:
+        1. Fetch all worklog sums in ONE query using aggregation.
+        2. Fetch all existing payrolls for the month in ONE query.
+        3. Perform calculations in memory.
+        4. Use bulk_create and bulk_update.
         """
         try:
             target_date = parse_month_string(request.data.get("month", ""))
         except ValueError as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        employees = Employee.objects.filter(is_active=True).select_related("division")
+        employees = Employee.objects.filter(is_active=True)
         if not employees.exists():
-            return Response(
-                {"error": "No active employees found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return Response({"error": "No active employees found."}, status=status.HTTP_404_NOT_FOUND)
 
-        results   = []
-        created_c = 0
-        updated_c = 0
+        # 1. Fetch all WorkLog sums for this month in ONE query
+        logs = WorkLog.objects.filter(
+            date__year=target_date.year,
+            date__month=target_date.month
+        ).values('employee').annotate(total_hours=Sum('hours'))
+        
+        hours_map = {l['employee']: l['total_hours'] for l in logs}
+
+        # 2. Fetch existing payrolls to determine create vs update
+        existing_payrolls = {
+            p.employee_id: p for p in Payroll.objects.filter(month=target_date)
+        }
+
+        to_create = []
+        to_update = []
+        
+        from decimal import Decimal
 
         for emp in employees:
-            total_hours = (
-                WorkLog.objects
-                .filter(
-                    employee=emp,
-                    date__year=target_date.year,
-                    date__month=target_date.month,
-                )
-                .aggregate(total=Sum("hours"))["total"]
-            ) or 0.0
-
-            per_hour     = float(emp.per_hr or 0.0)
-            total_salary = round(total_hours * per_hour, 2)
-
-            payroll, created = Payroll.objects.update_or_create(
-                employee=emp,
-                month=target_date,
-                defaults={
-                    "total_hours":  total_hours,
-                    "per_hour":     per_hour,
-                    "bonus":        0.0,
-                    "deductions":   0.0,
-                    "total_salary": total_salary,
-                    # Preserve existing status on re-generate
-                },
-            )
-
-            if created:
-                created_c += 1
+            total_hours = hours_map.get(emp.id, 0.0)
+            per_hour = Decimal(str(emp.per_hr or 0.0))
+            
+            if emp.id in existing_payrolls:
+                payroll = existing_payrolls[emp.id]
+                payroll.total_hours = total_hours
+                payroll.per_hour = per_hour
+                # total_salary is handled by save() or manually here for bulk_update
+                payroll.total_salary = (Decimal(str(total_hours)) * per_hour) + \
+                                       Decimal(str(payroll.bonus)) - \
+                                       Decimal(str(payroll.deductions))
+                to_update.append(payroll)
             else:
-                updated_c += 1
+                # Calculate salary for new record
+                total_salary = Decimal(str(total_hours)) * per_hour
+                to_create.append(Payroll(
+                    employee=emp,
+                    month=target_date,
+                    total_hours=total_hours,
+                    per_hour=per_hour,
+                    total_salary=total_salary,
+                    bonus=0,
+                    deductions=0,
+                    status='pending'
+                ))
 
-            results.append(PayrollSerializer(payroll).data)
+        # 3. Bulk DB Operations
+        if to_create:
+            Payroll.objects.bulk_create(to_create)
+        if to_update:
+            Payroll.objects.bulk_update(to_update, ['total_hours', 'per_hour', 'total_salary'])
 
         return Response(
             {
                 "message":  "Payroll generated successfully.",
                 "month":    target_date.strftime("%Y-%m"),
-                "created":  created_c,
-                "updated":  updated_c,
-                "total":    len(results),
-                "data":     results,
+                "created":  len(to_create),
+                "updated":  len(to_update),
+                "total":    len(to_create) + len(to_update),
             },
             status=status.HTTP_200_OK,
         )
@@ -316,4 +327,4 @@ class PayrollAnalyticsView(views.APIView):
             "division_data":     division_data,
             "top_employees":     top_employees,
             "monthly_trend":     monthly_trend,
-        })c
+        })

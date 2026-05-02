@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axiosInstance from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
-import "./Payroll.css"; // Reuse existing styles
+import "./PayrollAnalytics.css";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -13,116 +13,217 @@ import {
   Title,
   Tooltip,
   Legend,
+  Filler,
 } from "chart.js";
-import { Line, Bar, Pie, Scatter } from "react-chartjs-2";
+import { Line, Bar, Doughnut, Scatter } from "react-chartjs-2";
 
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
+  CategoryScale, LinearScale, PointElement, LineElement,
+  BarElement, ArcElement, Title, Tooltip, Legend, Filler
 );
 
-const PRIMARY_COLOR = "#3b82f6"; // var(--blue-500)
-const SUCCESS_COLOR = "#22c55e"; // var(--success)
-const WARNING_COLOR = "#f59e0b"; // var(--warning)
+// ── Palette ────────────────────────────────────────────────────────────────
+const C = {
+  blue:    "#2196F3",
+  teal:    "#00ACC1",
+  green:   "#2e7d32",
+  amber:   "#f59e0b",
+  rose:    "#e11d48",
+  violet:  "#7c3aed",
+  sky:     "#0ea5e9",
+  slate:   "#64748b",
+  divPalette: ["#2196F3","#00ACC1","#7c3aed","#f59e0b","#e11d48","#2e7d32","#0ea5e9"],
+};
 
+const baseChartOpts = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 600 },
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11, family: "'DM Sans'" }, color: "#9aa5b4" } },
+    y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11, family: "'DM Sans'" }, color: "#9aa5b4" } },
+  },
+};
+
+// ── Small reusable KPI tile ────────────────────────────────────────────────
+function KpiTile({ label, value, sub, accent, icon }) {
+  return (
+    <div className="pa-kpi" style={{ "--accent": accent }}>
+      <div className="pa-kpi-icon">{icon}</div>
+      <div className="pa-kpi-body">
+        <div className="pa-kpi-value">{value}</div>
+        <div className="pa-kpi-label">{label}</div>
+        {sub && <div className="pa-kpi-sub">{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ── Chart wrapper ──────────────────────────────────────────────────────────
+function ChartCard({ title, height = 200, children, action }) {
+  return (
+    <div className="pa-card">
+      <div className="pa-card-head">
+        <span className="pa-card-title">{title}</span>
+        {action}
+      </div>
+      <div style={{ height, position: "relative" }}>{children}</div>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
 function PayrollAnalytics() {
-  const [loading, setLoading] = useState(true);
-  const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [year, setYear]                     = useState(new Date().getFullYear().toString());
+  const [employees, setEmployees]           = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
 
-  const [trendData, setTrendData] = useState([]);
-  const [divisionData, setDivisionData] = useState([]);
-  const [designationData, setDesignationData] = useState([]);
-  const [topEmployeesData, setTopEmployeesData] = useState([]);
-  const [scatterData, setScatterData] = useState([]);
-  const [alertsData, setAlertsData] = useState(null);
-  const [employeeTrendData, setEmployeeTrendData] = useState([]);
+  const [trend, setTrend]         = useState([]);
+  const [division, setDivision]   = useState([]);
+  const [desig, setDesig]         = useState([]);
+  const [topEmps, setTopEmps]     = useState([]);
+  const [scatter, setScatter]     = useState([]);
+  const [alerts, setAlerts]       = useState(null);
+  const [empTrend, setEmpTrend]   = useState([]);
 
-  useEffect(() => {
-    fetchInitialData();
-  }, [year]);
+  // Summary KPIs derived from trend
+  const totalPayout  = trend.reduce((s, d) => s + (d.total || 0), 0);
+  const peakMonth    = trend.length ? trend.reduce((a, b) => b.total > a.total ? b : a, trend[0]) : null;
+  const topDivision  = division[0] || null;
+  const topEarner    = topEmps[0]  || null;
 
-  useEffect(() => {
-    if (selectedEmployee) {
-      fetchEmployeeTrend();
-    } else {
-      setEmployeeTrendData([]);
-    }
-  }, [selectedEmployee, year]);
-
-  const fetchInitialData = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [trend, div, desig, top, scatter, alerts, emps] = await Promise.all([
+      const [t, d, dg, te, sc, al, emps] = await Promise.all([
         axiosInstance.get(`/payroll/trend/?year=${year}`),
         axiosInstance.get(`/payroll/by-division/?year=${year}`),
         axiosInstance.get(`/payroll/by-designation/?year=${year}`),
         axiosInstance.get(`/payroll/top-employees/?year=${year}`),
         axiosInstance.get(`/payroll/scatter/?year=${year}`),
         axiosInstance.get(`/payroll/alerts/?year=${year}`),
-        axiosInstance.get(`/employees/?limit=1000`)
+        axiosInstance.get(`/employees/?limit=1000`),
       ]);
-      setTrendData(trend.data);
-      setDivisionData(div.data);
-      setDesignationData(desig.data);
-      setTopEmployeesData(top.data);
-      setScatterData(scatter.data);
-      setAlertsData(alerts.data);
-      
-      if (emps.data.results) {
-        setEmployees(emps.data.results);
-      } else {
-        setEmployees(emps.data);
-      }
-    } catch (err) {
-      console.error("Failed to load analytics data", err);
+      setTrend(t.data);
+      setDivision(d.data);
+      setDesig(dg.data);
+      setTopEmps(te.data);
+      setScatter(sc.data);
+      setAlerts(al.data);
+      setEmployees(emps.data.results || emps.data);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [year]);
 
-  const fetchEmployeeTrend = async () => {
+  const fetchEmpTrend = useCallback(async () => {
     try {
       const res = await axiosInstance.get(`/payroll/trend/${selectedEmployee}/?year=${year}`);
-      setEmployeeTrendData(res.data);
-    } catch (err) {
-      console.error("Failed to load employee trend", err);
-    }
+      setEmpTrend(res.data);
+    } catch (e) { console.error(e); }
+  }, [selectedEmployee, year]);
+
+  useEffect(() => { 
+    fetchAll(); 
+  }, [fetchAll]);
+
+  useEffect(() => {
+    if (selectedEmployee) fetchEmpTrend();
+    else setEmpTrend([]);
+  }, [selectedEmployee, fetchEmpTrend]);
+
+  const hasData = trend.length > 0 || division.length > 0;
+
+  const fmt = (n) =>
+    n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${Number(n).toFixed(0)}`;
+
+  // ── Chart data ─────────────────────────────────────────────────────────
+  const trendChartData = {
+    labels: trend.map(d => d.month),
+    datasets: [{
+      data: trend.map(d => d.total),
+      borderColor: C.blue,
+      backgroundColor: "rgba(33,150,243,0.08)",
+      fill: true, tension: 0.45,
+      pointRadius: 4, pointBackgroundColor: C.blue,
+      borderWidth: 2,
+    }],
   };
 
-  // Shared chart options
-  const defaultOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false }
-    }
+  const divChartData = {
+    labels: division.map(d => d.name),
+    datasets: [{
+      data: division.map(d => d.value),
+      backgroundColor: C.divPalette,
+      borderWidth: 0,
+      hoverOffset: 6,
+    }],
   };
 
-  const hasData = trendData.length > 0 || divisionData.length > 0;
+  const topEmpsChartData = {
+    labels: topEmps.map(d => d.name.split(" ")[0]),
+    datasets: [{
+      data: topEmps.map(d => d.total),
+      backgroundColor: topEmps.map((_, i) =>
+        i === 0 ? C.blue : i === 1 ? C.teal : "rgba(33,150,243,0.25)"
+      ),
+      borderRadius: 5,
+      borderSkipped: false,
+    }],
+  };
+
+  const desigChartData = {
+    labels: desig.map(d => d.name),
+    datasets: [{
+      data: desig.map(d => d.value),
+      backgroundColor: C.teal,
+      borderRadius: 4,
+      borderSkipped: false,
+    }],
+  };
+
+  const scatterChartData = {
+    datasets: [{
+      label: "Employees",
+      data: scatter.map(d => ({ x: d.hours, y: d.salary, name: d.name })),
+      backgroundColor: C.amber + "cc",
+      pointRadius: 6,
+      pointHoverRadius: 8,
+    }],
+  };
+
+  const empTrendChartData = {
+    labels: empTrend.map(d => d.month),
+    datasets: [{
+      data: empTrend.map(d => d.total),
+      borderColor: C.violet,
+      backgroundColor: "rgba(124,58,237,0.08)",
+      fill: true, tension: 0.4,
+      pointRadius: 4, pointBackgroundColor: C.violet,
+      borderWidth: 2,
+    }],
+  };
 
   return (
     <div className="dashboard-container">
       <Sidebar />
-      <main className="dashboard-main payroll-page">
-        <div className="payroll-header">
-          <div className="header-left">
-            <h1>Payroll Analytics</h1>
+      <main className="dashboard-main pa-page">
+
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <div className="pa-header">
+          <div>
+            <h1 className="pa-title">Payroll Analytics</h1>
+            <p className="pa-subtitle">Year-to-date compensation intelligence</p>
           </div>
-          <div className="header-right" style={{ display: "flex", gap: "12px" }}>
-            <select 
-              value={year} 
-              onChange={(e) => setYear(e.target.value)}
-              className="payroll-input"
-              style={{ padding: "8px 12px", width: "120px" }}
+          <div className="pa-header-controls">
+            <select
+              value={year}
+              onChange={e => setYear(e.target.value)}
+              className="pa-year-select"
             >
               {[2024, 2025, 2026, 2027].map(y => (
                 <option key={y} value={y}>{y}</option>
@@ -131,200 +232,207 @@ function PayrollAnalytics() {
           </div>
         </div>
 
-        <section className="dashboard-content">
-          {loading ? (
-            <div style={{ textAlign: "center", padding: "40px" }}>Loading analytics...</div>
-          ) : !hasData ? (
-             <div className="table-wrapper">
-               <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                 <div className="empty-state">
-                   <span style={{ fontSize: "30px", display: "block", marginBottom: "10px" }}>📊</span>
-                   <h3 style={{ margin: "0 0 5px 0", color: "var(--grey-800)" }}>No payroll data available</h3>
-                   <p style={{ margin: 0, color: "var(--grey-500)" }}>There is no payroll data for the selected year.</p>
-                 </div>
-               </div>
-             </div>
-          ) : (
-            <div className="kpi-dashboard" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-              
-              {/* Row 1: Monthly Trend */}
-              <div className="chart-card">
-                <h4>📈 Monthly Payroll Trend ({year})</h4>
-                <div className="chart-container" style={{ height: "300px", marginTop: "16px" }}>
-                  <Line 
-                    data={{
-                      labels: trendData.map(d => d.month),
-                      datasets: [{
-                        label: 'Total Salary ($)',
-                        data: trendData.map(d => d.total),
-                        borderColor: PRIMARY_COLOR,
-                        backgroundColor: `${PRIMARY_COLOR}20`,
-                        fill: true,
-                        tension: 0.4,
-                      }]
-                    }}
-                    options={defaultOptions}
-                  />
-                </div>
-              </div>
+        {loading ? (
+          <div className="pa-loading">
+            <div className="pa-spinner" />
+            <span>Loading analytics…</span>
+          </div>
+        ) : !hasData ? (
+          <div className="pa-empty">
+            <div className="pa-empty-icon">📊</div>
+            <h3>No payroll data for {year}</h3>
+            <p>Generate payroll from the Monthly Payroll page first.</p>
+          </div>
+        ) : (
+          <div className="pa-content">
 
-              {/* Row 2: Division Chart & Top Employees */}
-              <div className="payroll-charts-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: 0 }}>
-                <div className="chart-card">
-                  <h4>🏢 Payroll by Division</h4>
-                  <div className="chart-container" style={{ height: "250px", marginTop: "16px" }}>
-                    <Pie 
-                      data={{
-                        labels: divisionData.map(d => d.name),
-                        datasets: [{
-                          data: divisionData.map(d => d.value),
-                          backgroundColor: [
-                            PRIMARY_COLOR, WARNING_COLOR, SUCCESS_COLOR, 
-                            '#8b5cf6', '#ec4899', '#14b8a6'
-                          ],
-                        }]
-                      }}
-                      options={{ ...defaultOptions, plugins: { legend: { position: 'right' } } }}
-                    />
-                  </div>
-                </div>
+            {/* ── KPI Strip ──────────────────────────────────────────── */}
+            <div className="pa-kpi-row">
+              <KpiTile
+                icon="💰" label="Total Payout" accent={C.blue}
+                value={fmt(totalPayout)}
+                sub={`${trend.length} months recorded`}
+              />
+              <KpiTile
+                icon="📈" label="Peak Month" accent={C.teal}
+                value={peakMonth?.month || "—"}
+                sub={peakMonth ? fmt(peakMonth.total) : ""}
+              />
+              <KpiTile
+                icon="🏢" label="Top Division" accent={C.violet}
+                value={topDivision?.name || "—"}
+                sub={topDivision ? fmt(topDivision.value) : ""}
+              />
+              <KpiTile
+                icon="🏆" label="Top Earner" accent={C.amber}
+                value={topEarner?.name?.split(" ")[0] || "—"}
+                sub={topEarner ? fmt(topEarner.total) : ""}
+              />
+              {alerts && <>
+                <KpiTile icon="⚠️" label="High Salary" accent={C.rose}
+                  value={alerts.high_salary} sub="> $2,000 threshold" />
+                <KpiTile icon="🕐" label="Overtime" accent={C.amber}
+                  value={alerts.overtime} sub="> 220 hrs" />
+                <KpiTile icon="📉" label="Low Hours" accent={C.slate}
+                  value={alerts.low_work} sub="< 80 hrs" />
+              </>}
+            </div>
 
-                <div className="chart-card">
-                  <h4>👤 Top 5 Earners</h4>
-                  <div className="chart-container" style={{ height: "250px", marginTop: "16px" }}>
-                    <Bar 
-                      data={{
-                        labels: topEmployeesData.map(d => d.name),
-                        datasets: [{
-                          label: 'Salary ($)',
-                          data: topEmployeesData.map(d => d.total),
-                          backgroundColor: SUCCESS_COLOR,
-                          borderRadius: 4
-                        }]
-                      }}
-                      options={{ ...defaultOptions, indexAxis: 'y' }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 3: Employee Trend */}
-              <div className="chart-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <h4 style={{ margin: 0 }}>👤 Employee Monthly Trend</h4>
-                  <select 
-                    className="payroll-input" 
-                    value={selectedEmployee} 
-                    onChange={e => setSelectedEmployee(e.target.value)}
-                    style={{ width: "200px" }}
-                  >
-                    <option value="">Select Employee...</option>
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.emp_id})</option>
-                    ))}
-                  </select>
-                </div>
-                {selectedEmployee ? (
-                  <div className="chart-container" style={{ height: "250px" }}>
-                    <Line 
-                      data={{
-                        labels: employeeTrendData.map(d => d.month),
-                        datasets: [{
-                          label: 'Salary ($)',
-                          data: employeeTrendData.map(d => d.total),
-                          borderColor: WARNING_COLOR,
-                          backgroundColor: `${WARNING_COLOR}20`,
-                          fill: true,
-                          tension: 0.4,
-                        }]
-                      }}
-                      options={defaultOptions}
-                    />
-                  </div>
-                ) : (
-                  <div style={{ height: "250px", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--grey-500)" }}>
-                    Please select an employee to view their trend.
-                  </div>
-                )}
-              </div>
-
-              {/* Row 4: Designation Chart */}
-              <div className="chart-card">
-                <h4>💼 Salary by Designation</h4>
-                <div className="chart-container" style={{ height: "250px", marginTop: "16px" }}>
-                  <Bar 
-                    data={{
-                      labels: designationData.map(d => d.name),
-                      datasets: [{
-                        label: 'Total Salary ($)',
-                        data: designationData.map(d => d.value),
-                        backgroundColor: PRIMARY_COLOR,
-                        borderRadius: 4
-                      }]
-                    }}
-                    options={defaultOptions}
-                  />
-                </div>
-              </div>
-
-              {/* Row 5: Scatter & Alerts */}
-              <div className="payroll-charts-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: 0 }}>
-                <div className="chart-card">
-                  <h4>📊 Hours vs Salary (Scatter)</h4>
-                  <div className="chart-container" style={{ height: "250px", marginTop: "16px" }}>
-                    <Scatter 
-                      data={{
-                        datasets: [{
-                          label: 'Employees',
-                          data: scatterData.map(d => ({ x: d.hours, y: d.salary, name: d.name })),
-                          backgroundColor: WARNING_COLOR
-                        }]
-                      }}
-                      options={{
-                        ...defaultOptions,
-                        scales: {
-                          x: { title: { display: true, text: 'Total Hours' } },
-                          y: { title: { display: true, text: 'Total Salary ($)' } }
+            {/* ── Row 1: Trend (wide) + Doughnut ─────────────────────── */}
+            <div className="pa-grid pa-grid-7-5">
+              <ChartCard title="Monthly Payroll Trend" height={210}>
+                <Line
+                  data={trendChartData}
+                  options={{
+                    ...baseChartOpts,
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: ctx => ` $${Number(ctx.raw).toLocaleString()}`,
                         },
+                      },
+                    },
+                  }}
+                />
+              </ChartCard>
+
+              <ChartCard title="Cost by Division" height={210}>
+                <div className="pa-donut-wrap">
+                  <div className="pa-donut-chart">
+                    <Doughnut
+                      data={divChartData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: "68%",
+                        animation: { duration: 600 },
                         plugins: {
+                          legend: { display: false },
                           tooltip: {
                             callbacks: {
-                              label: (ctx) => `${ctx.raw.name}: ${ctx.raw.x} hrs, $${ctx.raw.y}`
-                            }
-                          }
-                        }
+                              label: ctx => ` $${Number(ctx.raw).toLocaleString()}`,
+                            },
+                          },
+                        },
                       }}
                     />
                   </div>
+                  <div className="pa-donut-legend">
+                    {division.slice(0, 6).map((d, i) => (
+                      <div key={i} className="pa-legend-item">
+                        <span className="pa-legend-dot" style={{ background: C.divPalette[i] }} />
+                        <span className="pa-legend-name">{d.name}</span>
+                        <span className="pa-legend-val">{fmt(d.value)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-
-                <div className="chart-card" style={{ display: "flex", flexDirection: "column" }}>
-                  <h4>🔔 Analytics Alerts</h4>
-                  {alertsData && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "16px", marginTop: "16px", flex: 1, justifyContent: "center" }}>
-                      <div className="analytics-card warning-card" style={{ marginBottom: 0 }}>
-                        <div className="analytics-label">🔴 High Salary Records</div>
-                        <div className="analytics-value" style={{ color: "var(--danger)" }}>{alertsData.high_salary}</div>
-                        <div className="analytics-subtext">Salary &gt; $2,000</div>
-                      </div>
-                      <div className="analytics-card pending-card" style={{ marginBottom: 0 }}>
-                        <div className="analytics-label">🟠 High Overtime</div>
-                        <div className="analytics-value" style={{ color: "var(--warning)" }}>{alertsData.overtime}</div>
-                        <div className="analytics-subtext">Hours &gt; 220</div>
-                      </div>
-                      <div className="analytics-card total" style={{ marginBottom: 0 }}>
-                        <div className="analytics-label">🟡 Low Work Hours</div>
-                        <div className="analytics-value" style={{ color: "var(--purple-600)" }}>{alertsData.low_work}</div>
-                        <div className="analytics-subtext">Hours &lt; 80</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
+              </ChartCard>
             </div>
-          )}
-        </section>
+
+            {/* ── Row 2: Top Earners + Designation ───────────────────── */}
+            <div className="pa-grid pa-grid-5-7">
+              <ChartCard title="Top 5 Earners" height={200}>
+                <Bar
+                  data={topEmpsChartData}
+                  options={{
+                    ...baseChartOpts,
+                    indexAxis: "y",
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        callbacks: { label: ctx => ` $${Number(ctx.raw).toLocaleString()}` },
+                      },
+                    },
+                    scales: {
+                      x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
+                      y: { grid: { display: false }, ticks: { font: { size: 12, weight: "600" }, color: "#2d3748" } },
+                    },
+                  }}
+                />
+              </ChartCard>
+
+              <ChartCard title="Salary by Designation" height={200}>
+                <Bar
+                  data={desigChartData}
+                  options={{
+                    ...baseChartOpts,
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        callbacks: { label: ctx => ` $${Number(ctx.raw).toLocaleString()}` },
+                      },
+                    },
+                  }}
+                />
+              </ChartCard>
+            </div>
+
+            {/* ── Row 3: Employee Trend + Scatter ────────────────────── */}
+            <div className="pa-grid pa-grid-6-6">
+              <ChartCard
+                title="Employee Salary Trend"
+                height={190}
+                action={
+                  <select
+                    className="pa-emp-select"
+                    value={selectedEmployee}
+                    onChange={e => setSelectedEmployee(e.target.value)}
+                  >
+                    <option value="">Select employee…</option>
+                    {employees.map(emp => (
+                      <option key={emp.emp_id} value={emp.emp_id}>
+                        {emp.name} ({emp.emp_id})
+                      </option>
+                    ))}
+                  </select>
+                }
+              >
+                {selectedEmployee && empTrend.length > 0 ? (
+                  <Line
+                    data={empTrendChartData}
+                    options={{
+                      ...baseChartOpts,
+                      plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                          callbacks: { label: ctx => ` $${Number(ctx.raw).toLocaleString()}` },
+                        },
+                      },
+                    }}
+                  />
+                ) : (
+                  <div className="pa-placeholder">
+                    {selectedEmployee ? "No data for this employee" : "Select an employee above"}
+                  </div>
+                )}
+              </ChartCard>
+
+              <ChartCard title="Hours vs Salary" height={190}>
+                <Scatter
+                  data={scatterChartData}
+                  options={{
+                    ...baseChartOpts,
+                    plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: ctx => `${ctx.raw.name}: ${ctx.raw.x}h · $${Number(ctx.raw.y).toLocaleString()}`,
+                        },
+                      },
+                    },
+                    scales: {
+                      x: { title: { display: true, text: "Hours", font: { size: 11 }, color: "#9aa5b4" }, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
+                      y: { title: { display: true, text: "Salary ($)", font: { size: 11 }, color: "#9aa5b4" }, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
+                    },
+                  }}
+                />
+              </ChartCard>
+            </div>
+
+          </div>
+        )}
       </main>
     </div>
   );

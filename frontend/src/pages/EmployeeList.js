@@ -179,7 +179,7 @@ function EmployeeList() {
               <span className="search-icon">🔍</span>
               <input
                 type="text"
-                placeholder="Search by EMP ID or Name..."
+                placeholder="Search by ID, Name, WP, FIN or SSIC..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="search-input primary"

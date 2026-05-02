@@ -14,6 +14,13 @@ from .views import (
     # Audit
     leave_audit_log,
 )
+from .analytics_views import (
+    leave_analytics_summary,
+    leave_by_type,
+    leave_by_month,
+    leave_by_division,
+    leave_status_breakdown,
+)
 
 urlpatterns = [
     # ── Leave — Balance ─────────────────────────
@@ -29,4 +36,11 @@ urlpatterns = [
 
     # ── Leave — Audit Log ───────────────────────
     path('audit/',                       leave_audit_log),
+
+    # ── Analytics ───────────────────────────────
+    path('analytics/summary/',    leave_analytics_summary),
+    path('analytics/type/',       leave_by_type),
+    path('analytics/month/',      leave_by_month),
+    path('analytics/division/',   leave_by_division),
+    path('analytics/status/',     leave_status_breakdown),
 ]

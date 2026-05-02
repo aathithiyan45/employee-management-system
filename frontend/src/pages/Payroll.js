@@ -1,28 +1,11 @@
 import React, { useState, useEffect } from "react";
-import axiosInstance from "../axiosInstance";
+import { useNavigate } from "react-router-dom";
+import api from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
 import "./Payroll.css";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-} from "chart.js";
-import { Line } from "react-chartjs-2";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip
-);
 
 function Payroll() {
+  const navigate = useNavigate();
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(false);
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -39,38 +22,14 @@ function Payroll() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [ordering, setOrdering] = useState("-total_salary");
 
-  // Analytics state
-  const [analytics, setAnalytics] = useState(null);
-  const [analyticsError, setAnalyticsError] = useState(null);
-
-  useEffect(() => {
-    // Reset generated status when month changes
-    setGeneratedSuccess(false);
-    fetchPayrolls(month, page, search, statusFilter, ordering);
-    fetchAnalytics(month);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, page, search, statusFilter, ordering]);
-
-  const fetchAnalytics = async (selectedMonth) => {
-    try {
-      setAnalyticsError(null);
-      const res = await axiosInstance.get(`/payroll-summary/?month=${selectedMonth}`);
-      setAnalytics(res.data);
-    } catch (err) {
-      console.error("Failed to fetch analytics", err);
-      setAnalyticsError(err.response?.data?.error || err.message);
-      setAnalytics(null);
-    }
-  };
-
-  const fetchPayrolls = async (selectedMonth, currentPage, currentSearch, currentStatus, currentOrdering) => {
+  const fetchPayrolls = React.useCallback(async (selectedMonth, currentPage, currentSearch, currentStatus, currentOrdering) => {
     setLoading(true);
     try {
       let url = `/payroll/?month=${selectedMonth}&page=${currentPage}&ordering=${currentOrdering}`;
       if (currentSearch) url += `&search=${currentSearch}`;
       if (currentStatus !== "All") url += `&status=${currentStatus.toLowerCase()}`;
       
-      const res = await axiosInstance.get(url);
+      const res = await api.get(url);
       
       if (res.data.results) {
         setPayrolls(res.data.results);
@@ -89,18 +48,23 @@ function Payroll() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    // Reset generated status when month changes
+    setGeneratedSuccess(false);
+    fetchPayrolls(month, page, search, statusFilter, ordering);
+  }, [month, page, search, statusFilter, ordering, fetchPayrolls]);
 
   const handleGenerate = async () => {
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      await axiosInstance.post("/payroll/generate/", { month });
+      await api.post("/payroll/generate/", { month });
       setGeneratedSuccess(true);
       setPage(1);
       fetchPayrolls(month, 1, search, statusFilter, ordering);
-      fetchAnalytics(month);
     } catch (err) {
       console.error("Failed to generate payroll", err);
       setError("Failed to generate payroll. Please check connection.");
@@ -112,11 +76,10 @@ function Payroll() {
   const handleStatusChange = async (id, currentStatus) => {
     const newStatus = currentStatus === "pending" ? "paid" : "pending";
     try {
-      await axiosInstance.patch(`/payroll/${id}/`, { status: newStatus });
+      await api.patch(`/payroll/${id}/`, { status: newStatus });
       setPayrolls(payrolls.map(p => p.id === id ? { ...p, status: newStatus } : p));
       setSuccess(`Payroll marked as ${newStatus}!`);
       setTimeout(() => setSuccess(""), 3000);
-      fetchAnalytics(month); // Refresh analytics pending count
     } catch (err) {
       console.error("Failed to update status", err);
       setError("Failed to update status.");
@@ -142,20 +105,26 @@ function Payroll() {
           <div className="header-left">
             <h1>Monthly Payroll</h1>
           </div>
-          {analytics && analytics.total_hours > 0 && (
-            <div className="header-right">
-              <span className="total-hours-badge">Total Hours This Month: {analytics.total_hours} hrs</span>
-            </div>
-          )}
+          <div className="header-right">
+            <button 
+              className="action-btn"
+              onClick={() => navigate('/payroll-analytics')}
+              style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px", background: "var(--blue-50)", color: "var(--blue-600)", border: "1px solid var(--blue-200)", borderRadius: "var(--radius-md)", fontWeight: "500", cursor: "pointer" }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20V10M18 20V4M6 20v-4" />
+              </svg>
+              View Analytics
+            </button>
+          </div>
         </div>
 
         <section className="dashboard-content">
           {error && <div className="payroll-alert payroll-alert-error">{error}</div>}
           {success && <div className="payroll-alert payroll-alert-success">{success}</div>}
 
-          {/* Top Section: Generation Form + Key Analytics */}
+          {/* Top Section: Generation Form */}
           <div className="payroll-top-section">
-            {/* Generation Section */}
             <div className="generation-form">
               <div className="form-group">
                 <label>Select Month</label>
@@ -181,92 +150,7 @@ function Payroll() {
                 </button>
               </div>
             </div>
-
-            {/* Top 3 Cards next to form */}
-            {analyticsError && (
-              <div style={{ color: 'red', background: '#ffebee', padding: '10px', borderRadius: '4px' }}>
-                Analytics Error: {analyticsError}
-              </div>
-            )}
-            
-            {analytics && (
-              <div className="top-analytics-cards">
-                <div className="analytics-card total">
-                  <div className="analytics-label">TOTAL PAYOUT</div>
-                  <div className="analytics-value" style={{ color: "var(--blue-600)" }}>${parseFloat(analytics.total_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </div>
-                <div className="analytics-card division">
-                  <div className="analytics-label">HIGHEST COST DIVISION</div>
-                  <div className="analytics-value" style={{ fontSize: "18px", color: "var(--warning)" }}>{analytics.division_data?.[0]?.division_name || 'N/A'}</div>
-                  {analytics.division_data?.[0] && (
-                    <div className="analytics-subtext">${parseFloat(analytics.division_data[0].total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  )}
-                </div>
-                <div className="analytics-card earner">
-                  <div className="analytics-label">TOP EARNER</div>
-                  <div className="analytics-value" style={{ fontSize: "18px", color: "var(--success)" }}>{analytics.top_employees?.[0]?.employee__name || 'N/A'}</div>
-                  {analytics.top_employees?.[0] && (
-                    <div className="analytics-subtext">${parseFloat(analytics.top_employees[0].total_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
-
-          {/* Analytics Cards */}
-          {analytics && (
-            <div className="kpi-dashboard">
-              <div className="analytics-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-                <div className="analytics-card hours">
-                  <div className="analytics-label">⏱️ Total Hours</div>
-                  <div className="analytics-value">{analytics.total_hours || 0} hrs</div>
-                </div>
-                <div className="analytics-card avg">
-                  <div className="analytics-label">📊 Average Salary</div>
-                  <div className="analytics-value">${parseFloat(analytics.avg_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </div>
-                <div className="analytics-card warning-card">
-                  <div className="analytics-label">⚠️ No Work Logs</div>
-                  <div className="analytics-value" style={{ color: "var(--danger)" }}>{analytics.no_worklogs_count || 0}</div>
-                  <div className="analytics-subtext">Employees missing logs</div>
-                </div>
-                <div className="analytics-card pending-card">
-                  <div className="analytics-label">🟠 Pending Payroll</div>
-                  <div className="analytics-value" style={{ color: "var(--warning)" }}>{analytics.pending_count || 0}</div>
-                  <div className="analytics-subtext">Unpaid records</div>
-                </div>
-              </div>
-
-              {/* Monthly Trend Chart */}
-              <div className="payroll-charts-grid" style={{ gridTemplateColumns: "1fr" }}>
-                <div className="chart-card">
-                  <h4>📈 Monthly Payroll Trend</h4>
-                  <div className="chart-container" style={{ height: "200px" }}>
-                    <Line 
-                      data={{
-                        labels: analytics.monthly_trend?.map(t => t.month) || [],
-                        datasets: [{
-                          label: 'Total Payroll ($)',
-                          data: analytics.monthly_trend?.map(t => t.total) || [],
-                          borderColor: '#3b82f6',
-                          backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                          fill: true,
-                          tension: 0.4,
-                          pointBackgroundColor: '#3b82f6',
-                        }]
-                      }}
-                      options={{ 
-                        responsive: true, 
-                        maintainAspectRatio: false, 
-                        plugins: { legend: { display: false } },
-                        scales: { y: { beginAtZero: true } }
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Table Filters & Stats Bar */}
           <div className="table-filters-bar">

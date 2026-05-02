@@ -19,6 +19,9 @@ import Documents     from "./pages/Documents";
 import WorkLog       from "./pages/WorkLog";
 import Payroll       from "./pages/Payroll";
 import PayrollAnalytics from "./pages/PayrollAnalytics";
+import Invoices      from "./pages/Invoices";
+import EmployeeAnalytics from "./pages/EmployeeAnalytics";
+import LeaveAnalytics    from "./pages/LeaveAnalytics";
 import PrivateRoute   from "./components/PrivateRoute";
 
 import "./App.css";
@@ -68,6 +71,15 @@ function App() {
         } />
         <Route path="/payroll-analytics" element={
           <PrivateRoute requiredRole="admin"><PayrollAnalytics /></PrivateRoute>
+        } />
+        <Route path="/employee-analytics" element={
+          <PrivateRoute requiredRole="admin"><EmployeeAnalytics /></PrivateRoute>
+        } />
+        <Route path="/leave-analytics" element={
+          <PrivateRoute requiredRole="admin"><LeaveAnalytics /></PrivateRoute>
+        } />
+        <Route path="/invoices" element={
+          <PrivateRoute requiredRole="admin"><Invoices /></PrivateRoute>
         } />
 
         {/* ── HR only ─────────────────────────────────────── */}
