@@ -6,7 +6,7 @@ import "./Login.css";
 
 // Base URL pulled from env var — falls back to localhost for development.
 // In production set REACT_APP_API_URL in your .env file.
-const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api";
+const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
 
 // Role definitions — each maps to a server-side role value
 const ROLES = [
@@ -33,41 +33,59 @@ function Login() {
   const selectedRole = ROLES.find(r => r.id === role);
 
   const handleLogin = async () => {
+    console.log("Login attempt started for:", username, "Role selected:", role);
     setError("");
+    
     if (!username || !password) {
       setError("Please enter your username and password.");
       return;
     }
+
     setLoading(true);
     try {
-      const res = await axios.post(`${API_BASE}/login/`, { username, password }, { withCredentials: true });
+      const res = await axios.post(`${API_BASE}login/`, { username, password }, { withCredentials: true });
       const data = res.data;
-
-      // Validate the selected role matches the server-side role
-      if (data.role !== role) {
-        setError(`This account is not a${role === "admin" ? "n" : ""} ${selectedRole.label} account.`);
-        return;
-      }
-
-      // Persist session (excluding access token for security)
-      const { access, ...userData } = data;
-      localStorage.setItem("user", JSON.stringify(userData));
       
-      // Store access token in memory
-      setAccessToken(access);
+      console.log("Backend response received:", data);
 
-      // Force password change on first login
-      if (data.must_change_password) {
-        navigate("/change-password");
-        return;
+      // 1. Check response using data.status === "success"
+      if (data.status === "success") {
+        console.log("Login successful!");
+
+        // 2. Store JWT token in localStorage
+        localStorage.setItem("access_token", data.access);
+        
+        // Update current session access token (in-memory)
+        setAccessToken(data.access);
+
+        // Store user data (excluding token for redundancy)
+        const { access, ...userData } = data;
+        localStorage.setItem("user", JSON.stringify(userData));
+
+        // 3. Handle password change requirement
+        if (data.must_change_password) {
+          console.log("User must change password. Redirecting...");
+          navigate("/change-password");
+          return;
+        }
+
+        // 4. Handle role-based login & Redirect to /dashboard
+        // We use the mapping to ensure Admin goes to /dashboard and others to their portals
+        const targetPath = ROLE_HOME[data.role] || "/dashboard";
+        console.log("Redirecting to:", targetPath);
+        navigate(targetPath);
+        
+      } else {
+        // Handle cases where status is not "success" but request didn't throw
+        console.warn("Login failed with status:", data.status);
+        setError(data.message || "Invalid credentials.");
       }
-
-      // Navigate to role-specific home
-      navigate(ROLE_HOME[data.role] || "/");
 
     } catch (err) {
-      // Use the server's message if available, otherwise generic
-      setError(err.response?.data?.message || "Invalid credentials. Please try again.");
+      // 5. Show error only if login fails
+      console.error("Axios login error:", err);
+      const serverMessage = err.response?.data?.message;
+      setError(serverMessage || "Invalid credentials. Please try again.");
     } finally {
       setLoading(false);
     }

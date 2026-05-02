@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './SetPassword.css';
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api";
+const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
 
 const SetPassword = () => {
     const { uid, token } = useParams();
@@ -31,10 +31,8 @@ const SetPassword = () => {
 
         setLoading(true);
         try {
-            await axios.post(`${API_BASE}/set-password/`, {
-                uid,
-                token,
-                new_password: password
+            await axios.post(`${API_BASE}set-password/${uid}/${token}/`, {
+                password: password
             });
             setSuccess(true);
             setTimeout(() => navigate('/login'), 3000);

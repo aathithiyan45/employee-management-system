@@ -39,7 +39,7 @@ function Invoices() {
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     try {
-      let url = "/invoices/";
+      let url = "invoices/";
       if (search) {
         url += `?search=${search}`;
       }
@@ -89,7 +89,7 @@ function Invoices() {
     setError("");
     setSuccess("");
     try {
-      await axiosInstance.post("/invoices/", formData);
+      await axiosInstance.post("invoices/", formData);
       setSuccess("Invoice added successfully!");
       setFormData({
         date: "",
@@ -112,7 +112,7 @@ function Invoices() {
     if (!window.confirm("Are you sure you want to delete this invoice?")) return;
     
     try {
-      await axiosInstance.delete(`/invoices/${id}/`);
+      await axiosInstance.delete(`invoices/${id}/`);
       setSuccess("Invoice deleted.");
       fetchInvoices();
     } catch (err) {
@@ -134,7 +134,7 @@ function Invoices() {
     data.append("file", uploadFile);
 
     try {
-      const res = await axiosInstance.post("/invoices/upload/", data, {
+      const res = await axiosInstance.post("invoices/upload/", data, {
         headers: { "Content-Type": "multipart/form-data" }
       });
       if (res.data.errors && res.data.errors.length > 0) {
@@ -153,7 +153,7 @@ function Invoices() {
 
   const handleDownload = async () => {
     try {
-      const res = await axiosInstance.get("/invoices/export/", { responseType: 'blob' });
+      const res = await axiosInstance.get("invoices/export/", { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
