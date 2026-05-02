@@ -74,35 +74,30 @@ if not DEBUG:
     MIDDLEWARE.insert(2, 'whitenoise.middleware.WhiteNoiseMiddleware')
 
 
-CSRF_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = False  # Must be False so frontend JS can read it for X-CSRFToken header
-CSRF_COOKIE_SAMESITE = 'Lax'
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000',
-    cast=Csv()
-)
-CORS_ALLOW_CREDENTIALS = True
-
-# CSRF_TRUSTED_ORIGINS MUST include the scheme (http:// or https://)
-CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
-
-
 # ─────────────────────────────────────────────
 # SECURITY - CLICKJACKING & CSP
 # ─────────────────────────────────────────────
-# X_FRAME_OPTIONS = 'DENY' is the most secure, but 'SAMEORIGIN' is often needed.
-# For cross-origin iframes (like React on 3000), frame-ancestors in CSP is the modern way.
 X_FRAME_OPTIONS = 'DENY'
-
-
 
 # ─────────────────────────────────────────────
 # CORS — loaded from .env
 # NEVER use CORS_ALLOW_ALL_ORIGINS = True in production
 # ─────────────────────────────────────────────
 CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = True
 
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
+# ✅ ADD THIS
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"https://.*\.vercel\.app",
+]
+
+CSRF_TRUSTED_ORIGINS = list(CORS_ALLOWED_ORIGINS)
+
+# CSRF/Cookie Settings
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = False  # Must be False so frontend JS can read it for X-CSRFToken header
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 
 # ─────────────────────────────────────────────

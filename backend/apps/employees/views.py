@@ -382,8 +382,15 @@ def import_excel(request):
     )
 
     # 4. Trigger Async Task
+    send_email = request.data.get('send_email', 'true')
+    # Handle both boolean and string "true"/"false" from FormData
+    if isinstance(send_email, str):
+        send_email_bool = send_email.lower() == 'true'
+    else:
+        send_email_bool = bool(send_email)
+
     from .tasks import process_employee_import
-    process_employee_import.delay(str(job.id), temp_path, request.user.id)
+    process_employee_import.delay(str(job.id), temp_path, request.user.id, send_email_bool)
 
     return Response({
         "message": "Import started",

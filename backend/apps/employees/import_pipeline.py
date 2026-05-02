@@ -29,9 +29,10 @@ class EmployeeImportPipeline:
     MAX_ERROR_ROWS = 500
     BATCH_SIZE = 500
 
-    def __init__(self, file_obj, user):
+    def __init__(self, file_obj, user, send_email=True):
         self.file_obj = file_obj
         self.user = user
+        self.send_email_global = send_email
         self.start_time = None
         self.results = {
             "total": 0,
@@ -110,7 +111,7 @@ class EmployeeImportPipeline:
                 self.progress_callback(processed_rows, self.results["total"])
 
         # Batch Invite Emails (Async via Celery)
-        if new_users_to_invite:
+        if self.send_email_global and new_users_to_invite:
             from apps.accounts.tasks import send_bulk_invite_emails
             user_ids = [u.id for u in new_users_to_invite]
             send_bulk_invite_emails.delay(user_ids)
@@ -205,15 +206,37 @@ class EmployeeImportPipeline:
                         
                         # If existing user still has no password, invite them
                         if not u.has_usable_password():
-                            new_users_to_invite.append(u)
-                            logger.info(f"Existing user {username} has no password, adding to invite list.")
+                            # Check for per-row override "SEND_EMAIL"
+                            row_dict = d['row_dict']
+                            row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
+                            should_invite = self.send_email_global
+                            if row_override is not None:
+                                should_invite = self._safe_bool(row_override)
+                                
+                            if should_invite:
+                                new_users_to_invite.append(u)
+                                logger.info(f"Existing user {username} has no password, adding to invite list.")
+                            else:
+                                logger.info(f"Existing user {username} has no password, but skipping invite.")
                     else:
                         # New user: create and invite
                         u = User(username=username, email=email, role='employee')
                         u.set_unusable_password()
                         users_to_create.append(u)
-                        new_users_to_invite.append(u)
-                        logger.info(f"New user {username} created, adding to invite list.")
+                        
+                        # Check for per-row override "SEND_EMAIL"
+                        # If present, it overrides the global setting
+                        row_dict = d['row_dict']
+                        row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
+                        should_invite = self.send_email_global
+                        if row_override is not None:
+                            should_invite = self._safe_bool(row_override)
+                            
+                        if should_invite:
+                            new_users_to_invite.append(u)
+                            logger.info(f"New user {username} created, adding to invite list.")
+                        else:
+                            logger.info(f"New user {username} created, skipping invite (send_email=False).")
 
                 if users_to_create:
                     User.objects.bulk_create(users_to_create)
@@ -299,7 +322,14 @@ class EmployeeImportPipeline:
                         
                         # Invite if new OR existing without password
                         if not user.has_usable_password():
-                            new_users_to_invite.append(user)
+                            row_dict = d['row_dict']
+                            row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
+                            should_invite = self.send_email_global
+                            if row_override is not None:
+                                should_invite = self._safe_bool(row_override)
+                                
+                            if should_invite:
+                                new_users_to_invite.append(user)
                         
                         rd = d['row_dict']
                         fields = {

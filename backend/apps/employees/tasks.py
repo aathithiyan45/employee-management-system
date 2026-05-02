@@ -9,8 +9,8 @@ from .import_pipeline import EmployeeImportPipeline
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True)
-def process_employee_import(self, job_id, file_path, user_id):
-    logger.info(f"Starting async import for job {job_id}...")
+def process_employee_import(self, job_id, file_path, user_id, send_email=True):
+    logger.info(f"Starting async import for job {job_id}... send_email={send_email}")
     """
     Asynchronous task to process employee Excel import.
     Updates the ImportJob status and progress.
@@ -24,7 +24,7 @@ def process_employee_import(self, job_id, file_path, user_id):
         
         # Open the file from the saved path
         with open(file_path, 'rb') as f:
-            pipeline = EmployeeImportPipeline(f, user)
+            pipeline = EmployeeImportPipeline(f, user, send_email=send_email)
             
             # Hook into the pipeline to update progress
             # We'll modify the pipeline to accept a progress callback

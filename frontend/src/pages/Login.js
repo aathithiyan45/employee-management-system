@@ -6,7 +6,7 @@ import "./Login.css";
 
 // Base URL pulled from env var — falls back to localhost for development.
 // In production set REACT_APP_API_URL in your .env file.
-const API_BASE = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
+const API_BASE = process.env.REACT_APP_API_URL;
 
 // Role definitions — each maps to a server-side role value
 const ROLES = [

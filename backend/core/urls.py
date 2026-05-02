@@ -13,6 +13,5 @@ urlpatterns = [
     path('api/', include('apps.payroll.urls')),
     path('api/', include('apps.invoices.urls')),
 ]
-
-# Media files are served via secure views in apps/documents/views.py
-# static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) is removed for security.
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

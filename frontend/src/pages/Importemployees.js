@@ -49,6 +49,7 @@ const ALL_COLS = [
   { col: "ACCOMODATION",              required: false },
   { col: "PCP STATUS",                required: false },
   { col: "REMARKS",                   required: false },
+  { col: "SEND_EMAIL",                required: false, note: "1=Send invite, 0=Skip (overrides checkbox)" },
 ];
 
 // ── Upload Panel ──────────────────────────────────────────
@@ -59,6 +60,7 @@ function UploadPanel({ onSuccess }) {
   const [result, setResult]       = useState(null);
   const [errorMsg, setErrorMsg]   = useState("");
   const [dragOver, setDragOver]   = useState(false);
+  const [sendEmail, setSendEmail] = useState(true);
   const inputRef = useRef();
 
   const handleFile = (f) => {
@@ -100,6 +102,7 @@ function UploadPanel({ onSuccess }) {
 
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("send_email", sendEmail);
 
     try {
       const res = await api.post("import/", formData, {
@@ -266,6 +269,20 @@ function UploadPanel({ onSuccess }) {
             <div className="file-check">
               <Icon d="M20 6 9 17l-5-5" size={14} stroke="white" />
             </div>
+          </div>
+
+          <div className="email-toggle-container">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={sendEmail}
+                onChange={(e) => setSendEmail(e.target.checked)}
+              />
+              <span className="checkbox-text">Send Email Invitations to New Employees</span>
+            </label>
+            <p className="checkbox-help">
+              If checked, new employees will receive a secure link to set their password.
+            </p>
           </div>
 
           <button className="upload-btn" onClick={handleUpload}>Start Import</button>

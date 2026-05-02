@@ -9,7 +9,7 @@ function getCSRFToken() {
 }
 
 // Base URL from env — set REACT_APP_API_URL in production .env
-const BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
+const BASE_URL = process.env.REACT_APP_API_URL;
 
 // Access token stored in memory only (never localStorage/sessionStorage) — XSS protection
 let accessToken = null;
