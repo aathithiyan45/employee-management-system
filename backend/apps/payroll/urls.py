@@ -8,5 +8,5 @@ router.register(r'payroll', PayrollViewSet, basename='payroll')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('payroll-analytics/', PayrollAnalyticsView.as_view(), name='payroll-analytics'),
+    path('payroll-summary/', PayrollAnalyticsView.as_view(), name='payroll-summary'),
 ]

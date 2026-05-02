@@ -1,179 +1,319 @@
-from rest_framework import viewsets, views, status, filters
-from rest_framework.response import Response
-from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum, F
-from django.utils.dateparse import parse_date
+"""
+views.py — Payroll App Views
+Covers: WorkLog CRUD, Payroll Generation, Payroll CRUD, Payroll Analytics
+"""
+
 import datetime
+from datetime import date
+
+from django.db.models import Sum, Avg, F, Q
+from django.utils.dateparse import parse_date
+
+from rest_framework import viewsets, views, filters, status
+from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
 from .models import WorkLog, Payroll
 from .serializers import WorkLogSerializer, PayrollSerializer
 from .permissions import IsAdminOrHR
 from apps.employees.models import Employee
 
+
+# ─────────────────────────────────────────────
+# HELPERS
+# ─────────────────────────────────────────────
+
+def parse_month_string(month_str):
+    """
+    Accept 'YYYY-MM' or 'YYYY-MM-DD'.
+    Always returns a date(year, month, 1) or raises ValueError.
+    """
+    if not month_str:
+        raise ValueError("Month is required.")
+    if len(month_str) == 7:
+        month_str += "-01"
+    target = parse_date(month_str)
+    if not target:
+        raise ValueError(f"Invalid month format: '{month_str}'. Use YYYY-MM.")
+    return target.replace(day=1)
+
+
+# ─────────────────────────────────────────────
+# WORKLOG VIEWSET
+# ─────────────────────────────────────────────
+
 class WorkLogViewSet(viewsets.ModelViewSet):
-    queryset = WorkLog.objects.all().order_by('-date')
+    """
+    CRUD for daily work logs.
+
+    Query params:
+      ?employee=<emp_id|pk>   — filter by employee
+      ?month=YYYY-MM          — filter by month
+    """
+    queryset = WorkLog.objects.select_related("employee").order_by("-date")
     serializer_class = WorkLogSerializer
     permission_classes = [IsAuthenticated, IsAdminOrHR]
 
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields   = ["employee__name", "employee__emp_id"]
+    ordering_fields = ["date", "hours", "employee__name"]
+
     def get_queryset(self):
-        queryset = super().get_queryset()
-        employee_id = self.request.query_params.get('employee', None)
-        month = self.request.query_params.get('month', None)
+        qs = super().get_queryset()
+
+        employee_id = self.request.query_params.get("employee")
+        month       = self.request.query_params.get("month")
 
         if employee_id:
             if employee_id.isdigit():
-                queryset = queryset.filter(employee_id=employee_id)
+                qs = qs.filter(employee_id=employee_id)
             else:
-                queryset = queryset.filter(employee__emp_id=employee_id)
+                qs = qs.filter(employee__emp_id=employee_id)
+
         if month:
-            # Assumes month is YYYY-MM
             try:
-                year, month_num = month.split('-')
-                queryset = queryset.filter(date__year=year, date__month=month_num)
+                year, month_num = month.split("-")
+                qs = qs.filter(date__year=year, date__month=month_num)
             except ValueError:
-                pass
-        return queryset
+                pass   # silently ignore malformed month — return unfiltered set
+
+        return qs
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
 
-class PayrollViewSet(viewsets.ModelViewSet):
-    queryset = Payroll.objects.all().order_by('-month')
-    serializer_class = PayrollSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrHR]
 
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['employee__name', 'employee__emp_id']
-    ordering_fields = ['total_salary', 'total_hours', 'employee__name']
-    ordering = ['-total_salary']
+# ─────────────────────────────────────────────
+# PAYROLL VIEWSET
+# ─────────────────────────────────────────────
+
+class PayrollViewSet(viewsets.ModelViewSet):
+    """
+    CRUD + generate action for payroll records.
+
+    List query params:
+      ?month=YYYY-MM          — filter by month (required for meaningful results)
+      ?status=paid|pending    — filter by payment status
+      ?search=<text>          — search employee name or emp_id
+      ?ordering=<field>       — sort field (prefix '-' for descending)
+      ?page=<n>               — pagination
+
+    Actions:
+      POST /payroll/generate/ { "month": "YYYY-MM" }
+        — Create or update payroll records for all active employees.
+          Safe to call multiple times; uses update_or_create.
+    """
+    queryset = Payroll.objects.select_related(
+        "employee", "employee__division"
+    ).order_by("-total_salary")
+
+    serializer_class    = PayrollSerializer
+    permission_classes  = [IsAuthenticated, IsAdminOrHR]
+
+    filter_backends  = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields    = ["employee__name", "employee__emp_id"]
+    ordering_fields  = ["total_salary", "total_hours", "employee__name", "employee__emp_id"]
+    ordering         = ["-total_salary"]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        employee_id = self.request.query_params.get('employee_id', None)
-        year = self.request.query_params.get('year', None)
-        month = self.request.query_params.get('month', None)
-        status = self.request.query_params.get('status', None)
+        qs = super().get_queryset()
 
-        if employee_id:
-            if employee_id.isdigit():
-                queryset = queryset.filter(employee_id=employee_id)
-            else:
-                queryset = queryset.filter(employee__emp_id=employee_id)
-        if year:
-            queryset = queryset.filter(month__year=year)
+        month  = self.request.query_params.get("month")
+        status = self.request.query_params.get("status")
+
         if month:
-            queryset = queryset.filter(month=month if '-' in month and len(month) > 7 else month + "-01")
-        if status and status.lower() != 'all':
-            queryset = queryset.filter(status__iexact=status)
-            
-        return queryset
+            try:
+                target = parse_month_string(month)
+                qs = qs.filter(month=target)
+            except ValueError:
+                pass
 
-    @action(detail=False, methods=['post'])
+        if status and status.lower() != "all":
+            qs = qs.filter(status__iexact=status)
+
+        return qs
+
+    # ── Generate Payroll ──────────────────────────────────────────────────────
+
+    @action(detail=False, methods=["post"], url_path="generate")
     def generate(self, request):
-        month_str = request.data.get('month')
-        if not month_str:
-            return Response({"error": "Month is required (YYYY-MM-DD or YYYY-MM)"}, status=status.HTTP_400_BAD_REQUEST)
+        """
+        POST /payroll/generate/
+        Body: { "month": "YYYY-MM" }
 
+        Iterates over all active employees, sums their WorkLog hours for
+        the given month, and creates/updates a Payroll record for each.
+        Idempotent — safe to call multiple times for the same month.
+        """
         try:
-            if len(month_str) == 7:
-                month_str += "-01"
-            target_date = parse_date(month_str)
-            if not target_date:
-                raise ValueError
-        except ValueError:
-            return Response({"error": "Invalid month format"}, status=status.HTTP_400_BAD_REQUEST)
+            target_date = parse_month_string(request.data.get("month", ""))
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        employees = Employee.objects.filter(is_active=True)
-        results = []
+        employees = Employee.objects.filter(is_active=True).select_related("division")
+        if not employees.exists():
+            return Response(
+                {"error": "No active employees found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        results   = []
+        created_c = 0
+        updated_c = 0
 
         for emp in employees:
-            logs = WorkLog.objects.filter(employee=emp, date__year=target_date.year, date__month=target_date.month)
-            total_hours = logs.aggregate(total=Sum('hours'))['total'] or 0.0
+            total_hours = (
+                WorkLog.objects
+                .filter(
+                    employee=emp,
+                    date__year=target_date.year,
+                    date__month=target_date.month,
+                )
+                .aggregate(total=Sum("hours"))["total"]
+            ) or 0.0
 
-            per_hour = emp.per_hr or 0.0
-            
-            # Default bonus and deductions can be 0 initially, updated later
-            bonus = 0.0
-            deductions = 0.0
-
-            total_salary = (total_hours * per_hour) + bonus - deductions
+            per_hour     = float(emp.per_hr or 0.0)
+            total_salary = round(total_hours * per_hour, 2)
 
             payroll, created = Payroll.objects.update_or_create(
                 employee=emp,
-                month=target_date.replace(day=1),
+                month=target_date,
                 defaults={
-                    'total_hours': total_hours,
-                    'per_hour': per_hour,
-                    'bonus': bonus,
-                    'deductions': deductions,
-                    'total_salary': total_salary,
-                }
+                    "total_hours":  total_hours,
+                    "per_hour":     per_hour,
+                    "bonus":        0.0,
+                    "deductions":   0.0,
+                    "total_salary": total_salary,
+                    # Preserve existing status on re-generate
+                },
             )
+
+            if created:
+                created_c += 1
+            else:
+                updated_c += 1
+
             results.append(PayrollSerializer(payroll).data)
 
-        return Response({"message": "Payroll generated successfully", "data": results})
+        return Response(
+            {
+                "message":  "Payroll generated successfully.",
+                "month":    target_date.strftime("%Y-%m"),
+                "created":  created_c,
+                "updated":  updated_c,
+                "total":    len(results),
+                "data":     results,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# ─────────────────────────────────────────────
+# PAYROLL ANALYTICS VIEW
+# ─────────────────────────────────────────────
 
 class PayrollAnalyticsView(views.APIView):
+    """
+    GET /payroll-summary/?month=YYYY-MM
+
+    Returns aggregated analytics for the selected month:
+      - total_salary, total_hours, avg_salary
+      - pending_count, no_worklogs_count
+      - division_data  — per-division cost breakdown
+      - top_employees  — top 5 earners
+      - monthly_trend  — last 12 months total payroll
+    """
     permission_classes = [IsAuthenticated, IsAdminOrHR]
 
     def get(self, request):
-        month_str = request.query_params.get('month', datetime.date.today().strftime('%Y-%m-01'))
-        if len(month_str) == 7:
-            month_str += "-01"
+        # ── 1. Parse month param ─────────────────────────────────────────────
+        raw_month = request.query_params.get(
+            "month", date.today().strftime("%Y-%m")
+        )
         try:
-            target_date = parse_date(month_str)
-        except:
-            return Response({"error": "Invalid month"}, status=400)
+            target_date = parse_month_string(raw_month)
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=400)
 
-        payrolls = Payroll.objects.filter(month__year=target_date.year, month__month=target_date.month)
+        # ── 2. Base queryset for selected month ──────────────────────────────
+        payrolls = Payroll.objects.filter(
+            month__year=target_date.year,
+            month__month=target_date.month,
+        ).select_related("employee", "employee__division")
 
-        # Monthly total & avg
-        total_salary = payrolls.aggregate(total=Sum('total_salary'))['total'] or 0.0
-        total_hours_sum = payrolls.aggregate(total=Sum('total_hours'))['total'] or 0.0
-        employee_count = payrolls.count()
-        avg_salary = (total_salary / employee_count) if employee_count > 0 else 0.0
+        # ── 3. Scalar aggregates ─────────────────────────────────────────────
+        agg = payrolls.aggregate(
+            total_salary=Sum("total_salary"),
+            total_hours=Sum("total_hours"),
+            avg_salary=Avg("total_salary"),
+        )
 
-        # Pending count & Zero worklogs count
-        pending_payroll_count = payrolls.filter(status='Pending').count()
-        employees_with_no_worklogs = payrolls.filter(total_hours=0).count()
+        total_salary  = float(agg["total_salary"] or 0.0)
+        total_hours   = float(agg["total_hours"]  or 0.0)
+        avg_salary    = float(agg["avg_salary"]   or 0.0)
 
-        # By division
-        division_data = list(payrolls.values(division_name=F('employee__division__name')).annotate(
-            total=Sum('total_salary')
-        ).order_by('-total'))
+        # ── 4. Status & worklog counts ───────────────────────────────────────
+        # Use case-insensitive filter to handle 'Pending' / 'pending' variants
+        pending_count      = payrolls.filter(status__iexact="pending").count()
+        no_worklogs_count  = payrolls.filter(total_hours=0).count()
 
-        # Top 5 employees
-        top_employees = list(payrolls.order_by('-total_salary').values(
-            'employee__name', 'total_salary'
-        )[:5])
+        # ── 5. Division breakdown ────────────────────────────────────────────
+        # Exclude records with no linked division to avoid None keys
+        division_data = list(
+            payrolls
+            .exclude(employee__division__isnull=True)
+            .values(division_name=F("employee__division__name"))
+            .annotate(total=Sum("total_salary"))
+            .order_by("-total")
+        )
 
+        # ── 6. Top 5 earners ─────────────────────────────────────────────────
+        top_employees = list(
+            payrolls
+            .order_by("-total_salary")
+            .values("employee__name", "total_salary")[:5]
+        )
 
-        # Monthly Trend (last 12 months overall)
-        from dateutil.relativedelta import relativedelta
-        import datetime
-        twelve_months_ago = datetime.date.today() - relativedelta(months=12)
-        trend_payrolls = Payroll.objects.filter(month__gte=twelve_months_ago)
-        monthly_trend = list(trend_payrolls.values('month').annotate(
-            total=Sum('total_salary')
-        ).order_by('month'))
+        # ── 7. Monthly trend — last 12 months ───────────────────────────────
+        try:
+            from dateutil.relativedelta import relativedelta
+            twelve_months_ago = date.today() - relativedelta(months=12)
+        except ImportError:
+            # Fallback: approximate 12 months as 365 days if dateutil missing
+            twelve_months_ago = date.today() - datetime.timedelta(days=365)
 
-        # Format trend data nicely
-        formatted_trend = []
-        for item in monthly_trend:
-            month_str = item['month'].strftime('%b %Y') if isinstance(item['month'], datetime.date) else item['month']
-            formatted_trend.append({
-                "month": month_str,
-                "total": item['total']
+        trend_qs = (
+            Payroll.objects
+            .filter(month__gte=twelve_months_ago)
+            .values("month")
+            .annotate(total=Sum("total_salary"))
+            .order_by("month")
+        )
+
+        monthly_trend = []
+        for item in trend_qs:
+            m = item["month"]
+            label = (
+                m.strftime("%b %Y")
+                if isinstance(m, (date, datetime.date))
+                else str(m)
+            )
+            monthly_trend.append({
+                "month": label,
+                "total": float(item["total"] or 0.0),
             })
 
+        # ── 8. Return ────────────────────────────────────────────────────────
         return Response({
-            "total_salary": total_salary,
-            "total_hours": total_hours_sum,
-            "avg_salary": avg_salary,
-            "pending_count": pending_payroll_count,
-            "no_worklogs_count": employees_with_no_worklogs,
-            "division_data": division_data,
-            "top_employees": top_employees,
-            "monthly_trend": formatted_trend,
-            "month": target_date.strftime('%Y-%m')
-        })
+            "month":             target_date.strftime("%Y-%m"),
+            "total_salary":      round(total_salary, 2),
+            "total_hours":       round(total_hours, 2),
+            "avg_salary":        round(avg_salary, 2),
+            "pending_count":     pending_count,
+            "no_worklogs_count": no_worklogs_count,
+            "division_data":     division_data,
+            "top_employees":     top_employees,
+            "monthly_trend":     monthly_trend,
+        })c

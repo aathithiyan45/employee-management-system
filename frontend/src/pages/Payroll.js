@@ -41,6 +41,7 @@ function Payroll() {
 
   // Analytics state
   const [analytics, setAnalytics] = useState(null);
+  const [analyticsError, setAnalyticsError] = useState(null);
 
   useEffect(() => {
     // Reset generated status when month changes
@@ -52,10 +53,12 @@ function Payroll() {
 
   const fetchAnalytics = async (selectedMonth) => {
     try {
-      const res = await axiosInstance.get(`/payroll-analytics/?month=${selectedMonth}`);
+      setAnalyticsError(null);
+      const res = await axiosInstance.get(`/payroll-summary/?month=${selectedMonth}`);
       setAnalytics(res.data);
     } catch (err) {
       console.error("Failed to fetch analytics", err);
+      setAnalyticsError(err.response?.data?.error || err.message);
       setAnalytics(null);
     }
   };
@@ -150,41 +153,70 @@ function Payroll() {
           {error && <div className="payroll-alert payroll-alert-error">{error}</div>}
           {success && <div className="payroll-alert payroll-alert-success">{success}</div>}
 
-          {/* Generation Section */}
-          <div className="generation-form">
-            <div className="form-group">
-              <label>Select Month</label>
-              <input 
-                type="month" 
-                value={month} 
-                onChange={(e) => {
-                  setMonth(e.target.value);
-                  setPage(1);
-                }} 
-                className="payroll-input" 
-              />
+          {/* Top Section: Generation Form + Key Analytics */}
+          <div className="payroll-top-section">
+            {/* Generation Section */}
+            <div className="generation-form">
+              <div className="form-group">
+                <label>Select Month</label>
+                <input 
+                  type="month" 
+                  value={month} 
+                  onChange={(e) => {
+                    setMonth(e.target.value);
+                    setPage(1);
+                  }} 
+                  className="payroll-input" 
+                />
+              </div>
+              <div className="form-group">
+                <label>&nbsp;</label>
+                <button 
+                  className={`btn-save ${generatedSuccess ? 'success-btn' : ''}`} 
+                  onClick={handleGenerate} 
+                  disabled={loading || !month || generatedSuccess}
+                  style={{ height: "38px", padding: "0 20px" }}
+                >
+                  {loading ? "Processing..." : generatedSuccess ? "✔ Payroll Generated" : "Generate Payroll"}
+                </button>
+              </div>
             </div>
-            <div className="form-group">
-              <label>&nbsp;</label>
-              <button 
-                className={`btn-save ${generatedSuccess ? 'success-btn' : ''}`} 
-                onClick={handleGenerate} 
-                disabled={loading || !month || generatedSuccess}
-                style={{ height: "38px", padding: "0 20px" }}
-              >
-                {loading ? "Processing..." : generatedSuccess ? "✔ Payroll Generated" : "Generate Payroll"}
-              </button>
-            </div>
+
+            {/* Top 3 Cards next to form */}
+            {analyticsError && (
+              <div style={{ color: 'red', background: '#ffebee', padding: '10px', borderRadius: '4px' }}>
+                Analytics Error: {analyticsError}
+              </div>
+            )}
+            
+            {analytics && (
+              <div className="top-analytics-cards">
+                <div className="analytics-card total">
+                  <div className="analytics-label">TOTAL PAYOUT</div>
+                  <div className="analytics-value" style={{ color: "var(--blue-600)" }}>${parseFloat(analytics.total_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                </div>
+                <div className="analytics-card division">
+                  <div className="analytics-label">HIGHEST COST DIVISION</div>
+                  <div className="analytics-value" style={{ fontSize: "18px", color: "var(--warning)" }}>{analytics.division_data?.[0]?.division_name || 'N/A'}</div>
+                  {analytics.division_data?.[0] && (
+                    <div className="analytics-subtext">${parseFloat(analytics.division_data[0].total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  )}
+                </div>
+                <div className="analytics-card earner">
+                  <div className="analytics-label">TOP EARNER</div>
+                  <div className="analytics-value" style={{ fontSize: "18px", color: "var(--success)" }}>{analytics.top_employees?.[0]?.employee__name || 'N/A'}</div>
+                  {analytics.top_employees?.[0] && (
+                    <div className="analytics-subtext">${parseFloat(analytics.top_employees[0].total_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Analytics Cards */}
           {analytics && (
             <div className="kpi-dashboard">
-              <div className="analytics-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-                <div className="analytics-card total">
-                  <div className="analytics-label">💰 Total Payroll</div>
-                  <div className="analytics-value">${parseFloat(analytics.total_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </div>
+              <div className="analytics-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
                 <div className="analytics-card hours">
                   <div className="analytics-label">⏱️ Total Hours</div>
                   <div className="analytics-value">{analytics.total_hours || 0} hrs</div>
@@ -192,23 +224,6 @@ function Payroll() {
                 <div className="analytics-card avg">
                   <div className="analytics-label">📊 Average Salary</div>
                   <div className="analytics-value">${parseFloat(analytics.avg_salary || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                </div>
-              </div>
-
-              <div className="analytics-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-                <div className="analytics-card division">
-                  <div className="analytics-label">🏢 Highest Cost Division</div>
-                  <div className="analytics-value" style={{ fontSize: "18px" }}>{analytics.division_data?.[0]?.division_name || 'N/A'}</div>
-                  {analytics.division_data?.[0] && (
-                    <div className="analytics-subtext">${parseFloat(analytics.division_data[0].total).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  )}
-                </div>
-                <div className="analytics-card earner">
-                  <div className="analytics-label">👤 Top Earner</div>
-                  <div className="analytics-value" style={{ fontSize: "18px" }}>{analytics.top_employees?.[0]?.employee__name || 'N/A'}</div>
-                  {analytics.top_employees?.[0] && (
-                    <div className="analytics-subtext">${parseFloat(analytics.top_employees[0].total_salary).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                  )}
                 </div>
                 <div className="analytics-card warning-card">
                   <div className="analytics-label">⚠️ No Work Logs</div>

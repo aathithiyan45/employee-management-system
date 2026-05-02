@@ -27,6 +27,15 @@
   margin: 0;
 }
 
+/* Top Section Wrapper */
+.payroll-top-section {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  align-items: stretch; /* Make them same height */
+  flex-wrap: wrap; /* Responsive wrap */
+}
+
 /* Generation Form Styling (Matching Filter Styles) */
 .generation-form {
   display: flex;
@@ -37,7 +46,22 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--grey-200);
   box-shadow: var(--shadow-sm);
-  margin-bottom: 24px;
+  flex: 0 0 auto; /* Don't grow */
+}
+
+/* Top Analytics Cards beside Form */
+.top-analytics-cards {
+  display: flex;
+  gap: 16px;
+  flex: 1; /* Take remaining space */
+}
+
+.top-analytics-cards .analytics-card {
+  flex: 1;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .form-group {

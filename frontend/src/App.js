@@ -18,6 +18,7 @@ import AuditLogs      from "./pages/AuditLogs";
 import Documents     from "./pages/Documents";
 import WorkLog       from "./pages/WorkLog";
 import Payroll       from "./pages/Payroll";
+import PayrollAnalytics from "./pages/PayrollAnalytics";
 import PrivateRoute   from "./components/PrivateRoute";
 
 import "./App.css";
@@ -64,6 +65,9 @@ function App() {
         } />
         <Route path="/payroll" element={
           <PrivateRoute requiredRole="admin"><Payroll /></PrivateRoute>
+        } />
+        <Route path="/payroll-analytics" element={
+          <PrivateRoute requiredRole="admin"><PayrollAnalytics /></PrivateRoute>
         } />
 
         {/* ── HR only ─────────────────────────────────────── */}

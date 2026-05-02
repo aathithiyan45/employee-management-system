@@ -24,6 +24,14 @@ const ADMIN_NAV = [
       { path: "/audit-logs",label: "Audit Logs",     icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM12 8v4m0 4h.01" },
     ],
   },
+  {
+    label: "Analytics",
+    links: [
+      { path: "/payroll-analytics", label: "Payroll Analytics", icon: "M12 20V10M18 20V4M6 20v-4" },
+      { path: "/employee-analytics", label: "Employee Analytics", icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" },
+      { path: "/leave-analytics", label: "Leave Analytics", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
+    ],
+  },
 ];
 
 const HR_NAV = [
@@ -36,6 +44,14 @@ const HR_NAV = [
       { path: "/employees",    label: "Employees",       icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" },
       { path: "/worklog",      label: "WorkLog",         icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
       { path: "/payroll",      label: "Payroll",         icon: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
+    ],
+  },
+  {
+    label: "Analytics",
+    links: [
+      { path: "/payroll-analytics", label: "Payroll Analytics", icon: "M12 20V10M18 20V4M6 20v-4" },
+      { path: "/employee-analytics", label: "Employee Analytics", icon: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" },
+      { path: "/leave-analytics", label: "Leave Analytics", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
     ],
   },
 ];
