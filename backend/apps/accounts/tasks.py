@@ -1,13 +1,12 @@
 import logging
-from celery import shared_task
+
 from django.contrib.auth import get_user_model
 from .utils import send_invite_email
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
-@shared_task(bind=True, max_retries=3)
-def send_bulk_invite_emails(self, user_ids):
+def send_bulk_invite_emails(user_ids):
     """
     Asynchronous task to send invite emails to multiple users.
     Includes retry logic for SMTP resilience.

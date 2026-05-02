@@ -1,16 +1,15 @@
 import logging
 import time
 import os
-from celery import shared_task
+
 from django.utils import timezone
 from .models import ImportJob, User
 from .import_pipeline import EmployeeImportPipeline
 
 logger = logging.getLogger(__name__)
 
-@shared_task(bind=True)
-def process_employee_import(self, job_id, file_path, user_id, send_email=True):
-    logger.info(f"Starting async import for job {job_id}... send_email={send_email}")
+def process_employee_import(job_id, file_path, user_id, send_email=True):
+    logger.info(f"Starting sync import for job {job_id}... send_email={send_email}")
     """
     Asynchronous task to process employee Excel import.
     Updates the ImportJob status and progress.

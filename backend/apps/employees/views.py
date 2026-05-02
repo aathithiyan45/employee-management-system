@@ -324,7 +324,7 @@ def import_excel(request):
         return Response({"error": "No file uploaded"}, status=400)
 
     # 1. Security & File Validation
-    from .views import validate_upload, EXCEL_EXTENSIONS, EXCEL_MAGIC, EXCEL_MAX_BYTES
+    # Use global constants and functions defined in this module
     ok, err = validate_upload(
         file,
         allowed_extensions=EXCEL_EXTENSIONS,
@@ -390,7 +390,7 @@ def import_excel(request):
         send_email_bool = bool(send_email)
 
     from .tasks import process_employee_import
-    process_employee_import.delay(str(job.id), temp_path, request.user.id, send_email_bool)
+    process_employee_import(str(job.id), temp_path, request.user.id, send_email_bool)
 
     return Response({
         "message": "Import started",

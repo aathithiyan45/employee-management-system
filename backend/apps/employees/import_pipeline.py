@@ -114,7 +114,7 @@ class EmployeeImportPipeline:
         if self.send_email_global and new_users_to_invite:
             from apps.accounts.tasks import send_bulk_invite_emails
             user_ids = [u.id for u in new_users_to_invite]
-            send_bulk_invite_emails.delay(user_ids)
+            send_bulk_invite_emails(user_ids)
 
         # Generate Error File if needed
         if rows_with_errors:

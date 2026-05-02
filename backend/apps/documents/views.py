@@ -1,5 +1,6 @@
 import os
 from datetime import date
+from django.conf import settings
 from django.http import FileResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -92,15 +93,23 @@ def document_list_upload(request, emp_id):
     if not ok:
         return Response({'error': err}, status=400)
 
-    doc = EmployeeDocument.objects.create(
-        employee    = emp,
-        doc_type    = doc_type,
-        label       = label,
-        file        = file,
-        expiry_date = expiry,
-        uploaded_by = request.user,
-        notes       = notes,
-    )
+    try:
+        # Ensure media directory exists for this specific path
+        # upload_to='employee_docs/%Y/%m/'
+        media_path = os.path.join(settings.MEDIA_ROOT, 'employee_docs', date.today().strftime('%Y/%m'))
+        os.makedirs(media_path, exist_ok=True)
+
+        doc = EmployeeDocument.objects.create(
+            employee    = emp,
+            doc_type    = doc_type,
+            label       = label,
+            file        = file,
+            expiry_date = expiry,
+            uploaded_by = request.user,
+            notes       = notes,
+        )
+    except Exception as e:
+        return Response({'error': f"Failed to save document: {str(e)}"}, status=500)
 
     return Response({
         'id':          doc.id,
@@ -122,26 +131,34 @@ def document_delete(request, pk):
     except EmployeeDocument.DoesNotExist:
         return Response({'error': 'Document not found.'}, status=404)
 
-    # Log the deletion event before deleting the record
-    from apps.analytics.utils import log_event
-    log_event(
-        request.user, 
-        "document_deleted", 
-        {
-            "doc_id": doc.id, 
-            "doc_type": doc.doc_type, 
-            "label": doc.label,
-            "employee_id": doc.employee.emp_id,
-            "file_name": os.path.basename(doc.file.name)
-        }, 
-        request=request
-    )
+    try:
+        # Log the deletion event before deleting the record
+        from apps.analytics.utils import log_event
+        log_event(
+            request.user, 
+            "document_deleted", 
+            {
+                "doc_id": doc.id, 
+                "doc_type": doc.doc_type, 
+                "label": doc.label,
+                "employee_id": doc.employee.emp_id,
+                "file_name": os.path.basename(doc.file.name)
+            }, 
+            request=request
+        )
 
-    # Remove physical file from disk
-    if doc.file and os.path.isfile(doc.file.path):
-        os.remove(doc.file.path)
-    doc.delete()
-    return Response({'message': 'Document deleted successfully and action logged.'})
+        # Remove physical file from disk
+        if doc.file and os.path.isfile(doc.file.path):
+            try:
+                os.remove(doc.file.path)
+            except Exception as e:
+                # Log but continue deletion if file removal fails
+                print(f"Warning: Failed to delete physical file {doc.file.path}: {e}")
+
+        doc.delete()
+        return Response({'message': 'Document deleted successfully and action logged.'})
+    except Exception as e:
+        return Response({'error': f"Failed to delete document: {str(e)}"}, status=500)
 
 
 @api_view(['GET'])
@@ -260,14 +277,24 @@ def document_preview(request, pk):
         return Response({'error': 'Forbidden.'}, status=403)
 
     if not os.path.isfile(doc.file.path):
-        return Response({'error': 'File not found on server.'}, status=404)
+        return Response({'error': f'File not found on server disk. (Path: {doc.file.path})'}, status=404)
 
-    # Use 'inline' to allow browser rendering (like PDF preview)
-    response = FileResponse(doc.file.open('rb'))
-    response['Content-Disposition'] = 'inline'
-    
-    # Log the view event
-    from apps.analytics.utils import log_event
-    log_event(request.user, "document_viewed", {"doc_id": doc.id, "doc_type": doc.doc_type}, request=request)
-    
-    return response
+    try:
+        # Explicitly guess content type to ensure browser renders correctly (e.g. application/pdf)
+        import mimetypes
+        content_type, _ = mimetypes.guess_type(doc.file.name)
+        
+        # Use 'inline' to allow browser rendering (like PDF preview)
+        response = FileResponse(
+            doc.file.open('rb'), 
+            content_type=content_type or 'application/octet-stream'
+        )
+        response['Content-Disposition'] = 'inline'
+        
+        # Log the view event
+        from apps.analytics.utils import log_event
+        log_event(request.user, "document_viewed", {"doc_id": doc.id, "doc_type": doc.doc_type}, request=request)
+        
+        return response
+    except Exception as e:
+        return Response({'error': f"Failed to open file for preview: {str(e)}"}, status=500)

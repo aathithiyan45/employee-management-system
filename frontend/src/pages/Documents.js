@@ -38,7 +38,9 @@ function PreviewModal({ doc, onClose }) {
     const fetchFile = async () => {
       try {
         const res = await api.get(`/documents/${doc.id}/preview/`, { responseType: 'blob' });
-        url = URL.createObjectURL(new Blob([res.data]));
+        // res.data is already a Blob since we set responseType: 'blob'
+        // Just use it directly to preserve the correct MIME type (e.g. application/pdf)
+        url = URL.createObjectURL(res.data);
         setBlobUrl(url);
       } catch (err) {
         console.error("Preview failed", err);

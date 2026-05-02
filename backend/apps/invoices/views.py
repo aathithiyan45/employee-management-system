@@ -13,7 +13,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().order_by('-date', '-created_at')
     serializer_class = InvoiceSerializer
     permission_classes = [IsAuthenticated, IsAdminOrHR]
-    # pagination_class = None  # Use global default
+    pagination_class = None
     filter_backends = [filters.SearchFilter]
     search_fields = ['invoice_no', 'client_number', 'project_name']
 
