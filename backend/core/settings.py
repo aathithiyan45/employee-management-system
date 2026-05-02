@@ -7,6 +7,10 @@ via python-decouple. Never hardcode credentials here.
 from pathlib import Path
 from datetime import timedelta
 from decouple import config, Csv
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # ─────────────────────────────────────────────
 # BASE DIRECTORY
