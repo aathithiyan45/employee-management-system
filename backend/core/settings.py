@@ -127,18 +127,15 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # ─────────────────────────────────────────────
 # DATABASE — loaded from .env
 # ─────────────────────────────────────────────
+import dj_database_url
+import os
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME':     config('DB_NAME',     default='employee_db'),
-        'USER':     config('DB_USER',     default='postgres'),
-        'PASSWORD': config('DB_PASSWORD', default=''),
-        'HOST':     config('DB_HOST',     default='localhost'),
-        'PORT':     config('DB_PORT',     default='5432'),
-        'OPTIONS': {
-            'sslmode': 'require' if not DEBUG else 'prefer',
-        }
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL'),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
 
 
