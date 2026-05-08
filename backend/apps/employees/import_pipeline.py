@@ -25,7 +25,7 @@ class EmployeeImportPipeline:
     Phase 3: Clean Bulk DB Operations with fallback for visibility.
     """
     
-    REQUIRED_FIELDS = ["EMP_ID", "NAME", "EMAIL", "COMPANY"]
+    REQUIRED_FIELDS = ["EMP_ID", "NAME", "COMPANY"]
     MAX_ERROR_ROWS = 500
     BATCH_SIZE = 500
 
@@ -51,21 +51,32 @@ class EmployeeImportPipeline:
         self.seen_emp_ids = set()
         self.seen_emails = set()
 
+    def _safe_str(self, value):
+        if pd.isna(value): return ""
+        s = str(value).strip()
+        if s.lower() in ("nan", "none"): return ""
+        return s
+
     def _safe_date(self, value):
-        if pd.isna(value) or not str(value).strip(): return None
+        if pd.isna(value): return None
+        s = str(value).strip()
+        if not s or s.lower() in ("nan", "none"): return None
         try:
             return pd.to_datetime(value, errors="coerce").date()
         except: return None
 
     def _safe_float(self, value):
-        if pd.isna(value) or not str(value).strip(): return 0.0
+        if pd.isna(value): return 0.0
+        s = str(value).strip()
+        if not s or s.lower() in ("nan", "none"): return 0.0
         try:
             return float(value)
         except: return 0.0
 
     def _safe_bool(self, value):
-        if pd.isna(value) or value == "": return False
+        if pd.isna(value): return False
         s = str(value).strip().upper()
+        if not s or s in ("NAN", "NONE"): return False
         return s in ("1", "Y", "YES", "TRUE", "T")
 
     def run(self):
@@ -90,7 +101,7 @@ class EmployeeImportPipeline:
 
         # Validate columns
         # Required: EMPID, NAME, EMAIL, COMPANY
-        REQUIRED_MAP = {"EMPID": "EMP_ID", "NAME": "NAME", "EMAIL": "EMAIL", "COMPANY": "COMPANY"}
+        REQUIRED_MAP = {"EMPID": "EMP_ID", "NAME": "NAME", "COMPANY": "COMPANY"}
         missing_cols = [v for k, v in REQUIRED_MAP.items() if k not in full_df.columns]
         
         if missing_cols:
@@ -151,21 +162,23 @@ class EmployeeImportPipeline:
             row_num = index + 2
             row_errors = []
 
-            emp_id = str(row_dict.get("EMPID", row_dict.get("EMP_ID", ""))).strip().upper()
-            email = str(row_dict.get("EMAIL", "")).strip().lower()
+            emp_id = self._safe_str(row_dict.get("EMPID", row_dict.get("EMP_ID", ""))).upper()
+            email = self._safe_str(row_dict.get("EMAIL", "")).lower() or None
+            name = self._safe_str(row_dict.get("NAME", ""))
+            company = self._safe_str(row_dict.get("COMPANY", ""))
 
-            if not emp_id or not str(row_dict.get("NAME", "")).strip() or not email or not str(row_dict.get("COMPANY", "")).strip():
-                row_errors.append({"field": "GENERAL", "error": "Missing required fields"})
+            if not emp_id or not name or not company:
+                row_errors.append({"field": "GENERAL", "error": "Missing required fields (EMP ID, Name, and Company are required)"})
 
             if emp_id in self.seen_emp_ids:
                 row_errors.append({"field": "EMP_ID", "error": "Duplicate in file"})
             self.seen_emp_ids.add(emp_id)
 
-            if email in self.seen_emails:
+            if email and email in self.seen_emails:
                 row_errors.append({"field": "EMAIL", "error": "Duplicate in file"})
-            self.seen_emails.add(email)
+            if email: self.seen_emails.add(email)
 
-            if email in self.existing_emails and emp_id not in self.existing_emp_ids:
+            if email and email in self.existing_emails and emp_id not in self.existing_emp_ids:
                 row_errors.append({"field": "EMAIL", "error": "Email already in use"})
 
             if row_errors:
@@ -189,59 +202,51 @@ class EmployeeImportPipeline:
         # --- Phase 3: Clean Bulk DB Operations ---
         try:
             with transaction.atomic():
-                # Step A: Sync Users
-                user_map = {u.username: u for u in User.objects.filter(username__in=[d['emp_id'] for d in chunk_data])}
-                users_to_create = []
-                users_to_update = []
+                # Step A: Sync Users (Only for rows with emails)
+                rows_with_emails = [d for d in chunk_data if d['email']]
+                user_map = {}
+                if rows_with_emails:
+                    user_map = {u.username: u for u in User.objects.filter(username__in=[d['emp_id'] for d in rows_with_emails])}
+                    users_to_create = []
+                    users_to_update = []
 
-                for d in chunk_data:
-                    username = d['emp_id']
-                    email = d['email']
-                    if username in user_map:
-                        u = user_map[username]
-                        # Update email if it changed in the Excel
-                        if u.email != email:
-                            u.email = email
-                            users_to_update.append(u)
-                        
-                        # If existing user still has no password, invite them
-                        if not u.has_usable_password():
-                            # Check for per-row override "SEND_EMAIL"
+                    for d in rows_with_emails:
+                        username = d['emp_id']
+                        email = d['email']
+                        if username in user_map:
+                            u = user_map[username]
+                            if u.email != email:
+                                u.email = email
+                                users_to_update.append(u)
+                            
+                            if not u.has_usable_password():
+                                row_dict = d['row_dict']
+                                row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
+                                should_invite = self.send_email_global
+                                if row_override is not None:
+                                    should_invite = self._safe_bool(row_override)
+                                if should_invite:
+                                    new_users_to_invite.append(u)
+                        else:
+                            u = User(username=username, email=email, role='employee')
+                            u.set_unusable_password()
+                            users_to_create.append(u)
+                            
                             row_dict = d['row_dict']
                             row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
                             should_invite = self.send_email_global
                             if row_override is not None:
                                 should_invite = self._safe_bool(row_override)
-                                
                             if should_invite:
                                 new_users_to_invite.append(u)
-                                logger.info(f"Existing user {username} has no password, adding to invite list.")
-                            else:
-                                logger.info(f"Existing user {username} has no password, but skipping invite.")
-                    else:
-                        # New user: create and invite
-                        u = User(username=username, email=email, role='employee')
-                        u.set_unusable_password()
-                        users_to_create.append(u)
-                        
-                        # Check for per-row override "SEND_EMAIL"
-                        # If present, it overrides the global setting
-                        row_dict = d['row_dict']
-                        row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
-                        should_invite = self.send_email_global
-                        if row_override is not None:
-                            should_invite = self._safe_bool(row_override)
-                            
-                        if should_invite:
-                            new_users_to_invite.append(u)
-                            logger.info(f"New user {username} created, adding to invite list.")
-                        else:
-                            logger.info(f"New user {username} created, skipping invite (send_email=False).")
 
-                if users_to_create:
-                    User.objects.bulk_create(users_to_create)
-                if users_to_update:
-                    User.objects.bulk_update(users_to_update, fields=['email'])
+                    if users_to_create:
+                        User.objects.bulk_create(users_to_create)
+                    if users_to_update:
+                        User.objects.bulk_update(users_to_update, fields=['email'])
+                    
+                    # Refresh user_map after creation
+                    user_map = {u.username: u for u in User.objects.filter(username__in=[d['emp_id'] for d in rows_with_emails])}
 
                 user_map = {u.username: u for u in User.objects.filter(username__in=[d['emp_id'] for d in chunk_data])}
                 emp_map = {e.emp_id: e for e in Employee.objects.filter(emp_id__in=[d['emp_id'] for d in chunk_data])}
@@ -254,38 +259,38 @@ class EmployeeImportPipeline:
                     rd = d['row_dict']
                     user = user_map.get(eid)
                     fields = {
-                        "name": str(rd.get("NAME")).strip(),
-                        "phone": str(rd.get("HPNUMBER", rd.get("PHONE", ""))).strip() or None,
-                        "nationality": str(rd.get("NATIONALITY", "")).strip() or None,
+                        "name": self._safe_str(rd.get("NAME")),
+                        "phone": self._safe_str(rd.get("HPNUMBER", rd.get("PHONE", ""))) or None,
+                        "nationality": self._safe_str(rd.get("NATIONALITY", "")) or None,
                         "dob": self._safe_date(rd.get("DOB")),
                         "division": d['division'],
                         "is_active": self._safe_bool(rd.get("ISACTIVE", True)),
-                        "designation_ipa": str(rd.get("IPADESIGNATION", "")).strip() or None,
-                        "designation_aug": str(rd.get("TRADE", rd.get("DESIGNATIONAUG", ""))).strip() or None,
-                        "trade": str(rd.get("TRADE", "")).strip() or None,
+                        "designation_ipa": self._safe_str(rd.get("IPADESIGNATION", "")) or None,
+                        "designation_aug": self._safe_str(rd.get("TRADE", rd.get("DESIGNATIONAUG", ""))) or None,
+                        "trade": self._safe_str(rd.get("TRADE", "")) or None,
                         "ipa_salary": d['salary'],
                         "salary": d['salary'],
                         "per_hr": self._safe_float(rd.get("PERHR")),
                         "doa": self._safe_date(rd.get("DOA")),
                         "arrival_date": self._safe_date(rd.get("ARRIVALDATE")),
                         "date_joined_company": self._safe_date(rd.get("DATEJOINED")),
-                        "work_permit_no": str(rd.get("ICWPNO", rd.get("WORKPERMITNO", ""))).strip() or None,
-                        "fin_no": str(rd.get("FINNO", "")).strip() or None,
-                        "ic_status": str(rd.get("ICTYPE", "")).strip() or None,
+                        "work_permit_no": self._safe_str(rd.get("ICWPNO", rd.get("WORKPERMITNO", ""))) or None,
+                        "fin_no": self._safe_str(rd.get("FINNO", "")) or None,
+                        "ic_status": self._safe_str(rd.get("ICTYPE", "")) or None,
                         "issue_date": self._safe_date(rd.get("ISSUANCEDATE")),
                         "wp_expiry": self._safe_date(rd.get("SPASSWPEXPRIY", rd.get("WPEXPIRY", rd.get("WORKPERMITEXPIRY", "")))),
-                        "passport_no": str(rd.get("PPNO", rd.get("PASSPORTNO", ""))).strip() or None,
+                        "passport_no": self._safe_str(rd.get("PPNO", rd.get("PASSPORTNO", ""))) or None,
                         "passport_expiry": self._safe_date(rd.get("PPEXPIRY", rd.get("PASSPORTEXPIRY", ""))),
-                        "ssic_gt_sn": str(rd.get("SSICGTSN", "")).strip() or None,
+                        "ssic_gt_sn": self._safe_str(rd.get("SSICGTSN", "")) or None,
                         "ssic_gt_exp": self._safe_date(rd.get("SSICGTEXPDATE")),
-                        "ssic_ht_sn": str(rd.get("SSICHTSN", "")).strip() or None,
+                        "ssic_ht_sn": self._safe_str(rd.get("SSICHTSN", "")) or None,
                         "ssic_ht_exp": self._safe_date(rd.get("SSICHTEXPDATE")),
                         "work_at_height": self._safe_bool(rd.get("WORKATHEIGHT")),
                         "confined_space": self._safe_bool(rd.get("CONFINEDSPACE")),
                         "signalman_rigger": self._safe_bool(rd.get("SIGNALMANRIGGERCOURSE", rd.get("SIGNALMANRIGGER", ""))),
-                        "bank_account": str(rd.get("BANKACCOUNTNUMBER", "")).strip() or None,
-                        "accommodation": str(rd.get("ACCOMODATION", rd.get("ACCOMMODATION", ""))).strip() or None,
-                        "remarks": str(rd.get("REMARKS", "")).strip() or None,
+                        "bank_account": self._safe_str(rd.get("BANKACCOUNTNUMBER", "")) or None,
+                        "accommodation": self._safe_str(rd.get("ACCOMODATION", rd.get("ACCOMMODATION", ""))) or None,
+                        "remarks": self._safe_str(rd.get("REMARKS", "")) or None,
                         "user": user
                     }
 
@@ -311,46 +316,48 @@ class EmployeeImportPipeline:
                     with transaction.atomic():
                         username = d['emp_id']
                         email = d['email']
-                        user, created = User.objects.get_or_create(username=username, defaults={"email": email, "role": "employee"})
-                        if not created:
-                            if user.email != email:
-                                user.email = email
-                                user.save(update_fields=['email'])
-                        else:
-                            user.set_unusable_password()
-                            user.save()
+                        user = None
                         
-                        # Invite if new OR existing without password
-                        if not user.has_usable_password():
-                            row_dict = d['row_dict']
-                            row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
-                            should_invite = self.send_email_global
-                            if row_override is not None:
-                                should_invite = self._safe_bool(row_override)
-                                
-                            if should_invite:
-                                new_users_to_invite.append(user)
+                        if email:
+                            user, created = User.objects.get_or_create(username=username, defaults={"email": email, "role": "employee"})
+                            if not created:
+                                if user.email != email:
+                                    user.email = email
+                                    user.save(update_fields=['email'])
+                            else:
+                                user.set_unusable_password()
+                                user.save()
+                            
+                            # Invite if new OR existing without password
+                            if not user.has_usable_password():
+                                row_dict = d['row_dict']
+                                row_override = row_dict.get("SENDEMAIL", row_dict.get("SEND_EMAIL"))
+                                should_invite = self.send_email_global
+                                if row_override is not None:
+                                    should_invite = self._safe_bool(row_override)
+                                if should_invite:
+                                    new_users_to_invite.append(user)
                         
                         rd = d['row_dict']
                         fields = {
-                            "name": str(rd.get("NAME")).strip(),
-                            "phone": str(rd.get("HPNUMBER", rd.get("PHONE", ""))).strip() or None,
-                            "nationality": str(rd.get("NATIONALITY", "")).strip() or None,
+                            "name": self._safe_str(rd.get("NAME")),
+                            "phone": self._safe_str(rd.get("HPNUMBER", rd.get("PHONE", ""))) or None,
+                            "nationality": self._safe_str(rd.get("NATIONALITY", "")) or None,
                             "dob": self._safe_date(rd.get("DOB")),
                             "division": d['division'],
                             "is_active": self._safe_bool(rd.get("ISACTIVE", True)),
-                            "designation_ipa": str(rd.get("IPADESIGNATION", "")).strip() or None,
-                            "designation_aug": str(rd.get("TRADE", rd.get("DESIGNATIONAUG", ""))).strip() or None,
-                            "trade": str(rd.get("TRADE", "")).strip() or None,
+                            "designation_ipa": self._safe_str(rd.get("IPADESIGNATION", "")) or None,
+                            "designation_aug": self._safe_str(rd.get("TRADE", rd.get("DESIGNATIONAUG", ""))) or None,
+                            "trade": self._safe_str(rd.get("TRADE", "")) or None,
                             "ipa_salary": d['salary'],
                             "salary": d['salary'],
                             "per_hr": self._safe_float(rd.get("PERHR")),
                             "doa": self._safe_date(rd.get("DOA")),
                             "arrival_date": self._safe_date(rd.get("ARRIVALDATE")),
                             "date_joined_company": self._safe_date(rd.get("DATEJOINED")),
-                            "work_permit_no": str(rd.get("ICWPNO", rd.get("WORKPERMITNO", ""))).strip() or None,
-                            "fin_no": str(rd.get("FINNO", "")).strip() or None,
-                            "ic_status": str(rd.get("ICTYPE", "")).strip() or None,
+                            "work_permit_no": self._safe_str(rd.get("ICWPNO", rd.get("WORKPERMITNO", ""))) or None,
+                            "fin_no": self._safe_str(rd.get("FINNO", "")) or None,
+                            "ic_status": self._safe_str(rd.get("ICTYPE", "")) or None,
                             "issue_date": self._safe_date(rd.get("ISSUANCEDATE")),
                             "wp_expiry": self._safe_date(rd.get("SPASSWPEXPRIY", rd.get("WPEXPIRY", rd.get("WORKPERMITEXPIRY", "")))),
                             "passport_no": str(rd.get("PPNO", rd.get("PASSPORTNO", ""))).strip() or None,
