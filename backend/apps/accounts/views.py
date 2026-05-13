@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view, permission_classes, throttle_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
+from .permissions import IsAdminOrHR
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -18,7 +19,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.db.models import F
-from .utils import send_invite_email
+
 from django_ratelimit.decorators import ratelimit
 from apps.analytics.utils import log_event
 
@@ -80,6 +81,13 @@ def login_view(request):
             pass
 
     if user:
+        if user.role not in ('admin', 'hr'):
+            log_event(None, "login_failed", {"username_input": username_input, "reason": "role_disabled"}, request=request)
+            return Response(
+                {"status": "error", "message": "Employee portal has been disabled. This system is for internal HR use only."},
+                status=403,
+            )
+
         # Security Hardening: Track last login IP (Proxy-aware)
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         user.last_login_ip = x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
@@ -125,7 +133,7 @@ def login_view(request):
 # ─────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 @authentication_classes([VersionedJWTAuthentication, SessionAuthentication])
 def logout_view(request):
     """
@@ -160,7 +168,7 @@ def logout_view(request):
 # ─────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def change_password(request):
     user = request.user
     new_password = request.data.get("new_password")
@@ -203,6 +211,9 @@ def set_password_view(request, uidb64, token):
         user = None
 
     if user is not None and default_token_generator.check_token(user, token):
+        if user.role not in ('admin', 'hr'):
+            return Response({'error': 'Employee portal has been disabled. Password setup is not allowed.'}, status=403)
+            
         password = request.data.get('password')
         if not password:
             return Response({'error': 'Password is required'}, status=400)
@@ -228,29 +239,3 @@ def set_password_view(request, uidb64, token):
         return Response({'message': 'Password has been set successfully. You can now login.'})
     else:
         return Response({'error': 'The invite link is invalid or has expired.'}, status=400)
-
-
-@api_view(['POST'])
-@ratelimit(key='ip', rate='3/m', method='POST', block=True)
-@permission_classes([IsAuthenticated])
-def resend_invite_view(request, emp_id):
-    if request.user.role not in ('admin', 'hr'):
-        return Response({'error': 'Admin or HR access required'}, status=403)
-        
-    try:
-        user = User.objects.get(username=emp_id)
-    except User.DoesNotExist:
-        # User enumeration protection: pretend we sent it
-        return Response({'message': 'If account exists, email sent'})
-
-    # Check 5 minutes cooldown
-    if user.invite_sent_at and (timezone.now() - user.invite_sent_at).total_seconds() < 300:
-        return Response({'error': 'Please wait 5 minutes before resending the invite'}, status=429)
-
-    user.invite_sent_at = timezone.now()
-    user.save()
-    
-    send_invite_email(user)
-    log_event(request.user, "resend_invite", {"target_user": user.username}, request=request)
-    
-    return Response({'message': 'If account exists, email sent'})

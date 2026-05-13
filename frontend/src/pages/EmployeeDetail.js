@@ -158,13 +158,17 @@ function EmployeeDetail() {
         </Section>
         
         {/* Payroll Trend */}
-        {payrolls.length > 0 && (
-          <Section title="Monthly Salary Trend" icon="📈" wide>
+        <Section title="Monthly Salary Trend" icon="📈" wide>
+          {payrolls.length > 0 ? (
             <div style={{ height: "300px", width: "100%", position: "relative" }}>
               <Line data={chartData} options={chartOptions} />
             </div>
-          </Section>
-        )}
+          ) : (
+            <p style={{ color: "var(--grey-500)", fontStyle: "italic", padding: "10px 0" }}>
+              No payroll history available for this employee.
+            </p>
+          )}
+        </Section>
 
         {/* Work Permit */}
         <Section title="Work Permit" icon="📋">
@@ -256,16 +260,7 @@ function EmployeeDetail() {
           </Section>
         )}
         
-        {/* Payroll Trend */}
-        <Section title="Monthly Payroll Trend" icon="📈" wide>
-          {payrolls.length > 0 ? (
-            <div style={{ height: "250px", width: "100%", marginTop: "10px" }}>
-              <Line data={chartData} options={chartOptions} />
-            </div>
-          ) : (
-            <p style={{ color: "var(--grey-500)", fontStyle: "italic", marginTop: "10px" }}>No payroll history available.</p>
-          )}
-        </Section>
+
       </div>
     </div>
   );

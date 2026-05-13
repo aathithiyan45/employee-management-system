@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from apps.accounts.permissions import IsAdminOrHR
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from django.core.exceptions import ValidationError
@@ -19,17 +20,14 @@ from apps.employees.views import (
 # ─────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_balance(request, emp_id):
     try:
         emp = Employee.objects.get(emp_id=emp_id)
     except Employee.DoesNotExist:
         return Response({"error": "Employee not found"}, status=404)
 
-    if request.user.role == 'employee':
-        profile = getattr(request.user, 'employee_profile', None)
-        if not profile or profile.emp_id != emp_id:
-            return Response({"error": "Permission denied"}, status=403)
+
 
     year = int(request.GET.get('year', date.today().year))
 
@@ -60,7 +58,7 @@ def leave_balance(request, emp_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_balance_adjust(request, emp_id):
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "HR or Admin access required"}, status=403)
@@ -137,33 +135,27 @@ def leave_balance_adjust(request, emp_id):
 # ─────────────────────────────────────────────
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_request_list(request):
     if request.method == 'GET':
-        if request.user.role == 'employee':
-            profile = getattr(request.user, 'employee_profile', None)
-            if not profile:
-                return Response({"error": "No employee profile linked"}, status=400)
-            qs = LeaveRequest.objects.filter(employee=profile)
-        else:
-            qs = LeaveRequest.objects.select_related('employee', 'reviewed_by').all()
+        qs = LeaveRequest.objects.select_related('employee', 'reviewed_by').all()
 
-            emp_id     = request.GET.get('emp_id')
-            status     = request.GET.get('status')
-            leave_type = request.GET.get('leave_type')
-            from_date  = request.GET.get('from_date')
-            to_date    = request.GET.get('to_date')
+        emp_id     = request.GET.get('emp_id')
+        status     = request.GET.get('status')
+        leave_type = request.GET.get('leave_type')
+        from_date  = request.GET.get('from_date')
+        to_date    = request.GET.get('to_date')
 
-            if emp_id:
-                qs = qs.filter(employee__emp_id=emp_id)
-            if status:
-                qs = qs.filter(status=status)
-            if leave_type:
-                qs = qs.filter(leave_type=leave_type)
-            if from_date:
-                qs = qs.filter(start_date__gte=from_date)
-            if to_date:
-                qs = qs.filter(end_date__lte=to_date)
+        if emp_id:
+            qs = qs.filter(employee__emp_id=emp_id)
+        if status:
+            qs = qs.filter(status=status)
+        if leave_type:
+            qs = qs.filter(leave_type=leave_type)
+        if from_date:
+            qs = qs.filter(start_date__gte=from_date)
+        if to_date:
+            qs = qs.filter(end_date__lte=to_date)
 
         paginator = PageNumberPagination()
         # Cap to 100 — prevents full-table dumps via ?page_size=999999
@@ -191,19 +183,13 @@ def leave_request_list(request):
         return paginator.get_paginated_response(data)
 
     # POST
-    if request.user.role == 'employee':
-        profile = getattr(request.user, 'employee_profile', None)
-        if not profile:
-            return Response({"error": "No employee profile linked"}, status=400)
-        employee = profile
-    else:
-        emp_id = request.data.get('emp_id')
-        if not emp_id:
-            return Response({"error": "emp_id is required"}, status=400)
-        try:
-            employee = Employee.objects.get(emp_id=emp_id)
-        except Employee.DoesNotExist:
-            return Response({"error": "Employee not found"}, status=404)
+    emp_id = request.data.get('emp_id')
+    if not emp_id:
+        return Response({"error": "emp_id is required"}, status=400)
+    try:
+        employee = Employee.objects.get(emp_id=emp_id)
+    except Employee.DoesNotExist:
+        return Response({"error": "Employee not found"}, status=404)
 
     leave_type = request.data.get('leave_type')
     start_raw  = request.data.get('start_date')
@@ -272,17 +258,14 @@ def leave_request_list(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_request_detail(request, pk):
     try:
         lr = LeaveRequest.objects.select_related('employee', 'reviewed_by').get(pk=pk)
     except LeaveRequest.DoesNotExist:
         return Response({"error": "Leave request not found"}, status=404)
 
-    if request.user.role == 'employee':
-        profile = getattr(request.user, 'employee_profile', None)
-        if not profile or profile.id != lr.employee.id:
-            return Response({"error": "Permission denied"}, status=403)
+
 
     return Response({
         "id":               lr.id,
@@ -304,7 +287,7 @@ def leave_request_detail(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_request_approve(request, pk):
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "HR or Admin access required"}, status=403)
@@ -332,7 +315,7 @@ def leave_request_approve(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_request_reject(request, pk):
     if request.user.role not in ('admin', 'hr'):
         return Response({"error": "HR or Admin access required"}, status=403)
@@ -351,17 +334,14 @@ def leave_request_reject(request, pk):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_request_cancel(request, pk):
     try:
         lr = LeaveRequest.objects.select_related('employee').get(pk=pk)
     except LeaveRequest.DoesNotExist:
         return Response({"error": "Leave request not found"}, status=404)
 
-    if request.user.role == 'employee':
-        profile = getattr(request.user, 'employee_profile', None)
-        if not profile or profile.id != lr.employee.id:
-            return Response({"error": "Permission denied"}, status=403)
+
 
     try:
         lr.cancel(cancelled_by=request.user)
@@ -376,24 +356,18 @@ def leave_request_cancel(request, pk):
 # ─────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_audit_log(request):
-    if request.user.role == 'employee':
-        profile = getattr(request.user, 'employee_profile', None)
-        if not profile:
-            return Response({"error": "No employee profile linked"}, status=400)
-        qs = LeaveAdjustmentLog.objects.filter(employee=profile)
-    else:
-        qs = LeaveAdjustmentLog.objects.select_related(
-            'employee', 'leave_request', 'performed_by'
-        ).all()
+    qs = LeaveAdjustmentLog.objects.select_related(
+        'employee', 'leave_request', 'performed_by'
+    ).all()
 
-        emp_id = request.GET.get('emp_id')
-        action = request.GET.get('action')
-        if emp_id:
-            qs = qs.filter(employee__emp_id=emp_id)
-        if action:
-            qs = qs.filter(action=action)
+    emp_id = request.GET.get('emp_id')
+    action = request.GET.get('action')
+    if emp_id:
+        qs = qs.filter(employee__emp_id=emp_id)
+    if action:
+        qs = qs.filter(action=action)
 
     paginator = PageNumberPagination()
     # Cap to 100 — prevents full-table dumps via ?page_size=999999

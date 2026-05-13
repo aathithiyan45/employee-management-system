@@ -227,6 +227,77 @@
   transform: translateY(-1px);
 }
 
+/* ── Dynamic Expiry Filter ── */
+.expiry-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid #e2e8f0;
+}
+
+.expiry-type-select {
+  border: none !important;
+  background-color: transparent !important;
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  min-width: 130px !important;
+  padding-right: 24px !important;
+}
+
+.expiry-days-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  padding: 0 8px;
+  border-left: 1.5px solid #cbd5e1;
+}
+
+.expiry-days-input {
+  width: 50px !important;
+  padding: 6px 4px !important;
+  border: 1.5px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+  text-align: center;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  outline: none;
+}
+
+.expiry-days-input:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+}
+
+.apply-expiry-btn {
+  padding: 8px 18px;
+  background: var(--blue-600);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+}
+
+.apply-expiry-btn:hover {
+  background: var(--blue-700);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.apply-expiry-btn:active {
+  transform: translateY(0);
+}
+
+
 /* stats bar */
 .stats-bar {
   margin-bottom: 16px;

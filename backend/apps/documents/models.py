@@ -12,14 +12,20 @@ class EmployeeDocument(models.Model):
     linked to an Employee.  Files are stored under MEDIA_ROOT/employee_docs/.
     """
 
-    DOC_PASSPORT    = 'passport'
-    DOC_WORK_PERMIT = 'work_permit'
-    DOC_OTHER       = 'other'
+    DOC_PASSPORT      = 'passport'
+    DOC_WORK_PERMIT   = 'work_permit'
+    DOC_SSIC_GT       = 'ssic_gt'
+    DOC_SSIC_HT       = 'ssic_ht'
+    DOC_SECURITY_BOND = 'security_bond'
+    DOC_OTHER         = 'other'
 
     DOC_TYPE_CHOICES = [
-        (DOC_PASSPORT,    'Passport'),
-        (DOC_WORK_PERMIT, 'Work Permit'),
-        (DOC_OTHER,       'Other'),
+        (DOC_PASSPORT,      'Passport'),
+        (DOC_WORK_PERMIT,   'Work Permit'),
+        (DOC_SSIC_GT,       'SSIC GT'),
+        (DOC_SSIC_HT,       'SSIC HT'),
+        (DOC_SECURITY_BOND, 'Security Bond'),
+        (DOC_OTHER,         'Other'),
     ]
 
     employee    = models.ForeignKey(

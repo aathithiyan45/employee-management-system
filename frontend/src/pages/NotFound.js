@@ -6,7 +6,6 @@ function NotFound() {
 
   const home = user?.role === "admin"    ? "/dashboard"
              : user?.role === "hr"       ? "/hr/dashboard"
-             : user?.role === "employee" ? "/employee/dashboard"
              : "/";
 
   return (

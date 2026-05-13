@@ -3,7 +3,6 @@ from django.urls import path
 from .views import (
     # Dashboard
     dashboard_view,
-    employee_dashboard_view,
 
     # Import / Export
     import_excel,
@@ -32,7 +31,6 @@ urlpatterns = [
 
     # Dashboard
     path('dashboard/',       dashboard_view),
-    path('employee-dashboard/', employee_dashboard_view),
 
 
 

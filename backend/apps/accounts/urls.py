@@ -6,7 +6,6 @@ from .views import (
     logout_view,
     change_password,
     set_password_view,
-    resend_invite_view,
 )
 
 urlpatterns = [
@@ -15,5 +14,4 @@ urlpatterns = [
     path('token/refresh/',   get_versioned_refresh_view().as_view()),
     path('change-password/', change_password, name='change_password'),
     path('set-password/<str:uidb64>/<str:token>/', set_password_view, name='set_password'),
-    path('resend-invite/<str:emp_id>/', resend_invite_view, name='resend_invite'),
 ]

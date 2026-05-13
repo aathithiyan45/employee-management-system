@@ -21,9 +21,12 @@ function ExpiryBadge({ daysLeft, expiryDate }) {
 }
 
 const DOC_META = {
-  passport:    { label: "Passport",    color: "blue", icon: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zM9 12l2 2 4-4" },
-  work_permit: { label: "Work Permit", color: "teal", icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" },
-  other:       { label: "Other",       color: "grey", icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" },
+  passport:      { label: "Passport",      color: "blue",   icon: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zM9 12l2 2 4-4" },
+  work_permit:   { label: "Work Permit",   color: "teal",   icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" },
+  ssic_gt:       { label: "SSIC GT",       color: "indigo", icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" },
+  ssic_ht:       { label: "SSIC HT",       color: "purple", icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" },
+  security_bond: { label: "Security Bond", color: "orange", icon: "M12 2L3 7v9c0 5.25 3.75 10.16 9 11.34 5.25-1.18 9-6.09 9-11.34V7l-9-5z" },
+  other:         { label: "Other",         color: "grey",   icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6" },
 };
 
 // ── Preview Modal ───────────────────────────────────────────
@@ -125,9 +128,7 @@ function UploadModal({ empId, onClose, onSuccess }) {
         fd.append('label', label || file.name);
         fd.append('expiry_date', expiry);
         fd.append('notes', notes);
-        await api.post(`/documents/${empId}/`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        await api.post(`/documents/${empId}/`, fd);
         results.push({ name: file.name, ok: true });
       } catch (err) {
         results.push({ name: file.name, ok: false, error: err.response?.data?.error });
@@ -159,6 +160,9 @@ function UploadModal({ empId, onClose, onSuccess }) {
           <select className="doc-input" value={docType} onChange={e => setDocType(e.target.value)}>
             <option value="passport">Passport</option>
             <option value="work_permit">Work Permit</option>
+            <option value="ssic_gt">SSIC GT</option>
+            <option value="ssic_ht">SSIC HT</option>
+            <option value="security_bond">Security Bond</option>
             <option value="other">Other</option>
           </select>
 
@@ -336,35 +340,7 @@ function AuditPanel({ empId }) {
   );
 }
 
-// ── Notification Banner ─────────────────────────────────────
-function NotificationBanner({ expiring }) {
-  const [dismissed, setDismissed] = useState(false);
-  if (dismissed || expiring.length === 0) return null;
-  const critical = expiring.filter(d => d.days_left <= 7);
-  const warning  = expiring.filter(d => d.days_left > 7 && d.days_left <= 30);
 
-  return (
-    <div className={`doc-notif-banner ${critical.length > 0 ? 'critical' : 'warning'}`}>
-      <Icon
-        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"
-        size={18}
-      />
-      <div className="doc-notif-text">
-        {critical.length > 0 && (
-          <strong>{critical.length} document{critical.length > 1 ? 's' : ''} expiring within 7 days! </strong>
-        )}
-        {warning.length > 0 && (
-          <span>{warning.length} document{warning.length > 1 ? 's' : ''} expiring within 30 days.</span>
-        )}
-        <span className="doc-notif-names">
-          {expiring.slice(0,3).map(d => `${d.emp_name} (${d.doc_type_label})`).join(' · ')}
-          {expiring.length > 3 && ` +${expiring.length - 3} more`}
-        </span>
-      </div>
-      <button className="doc-notif-close" onClick={() => setDismissed(true)}>×</button>
-    </div>
-  );
-}
 
 // ══════════════════════════════════════════════════════════════
 // MAIN PAGE
@@ -451,9 +427,12 @@ export default function Documents() {
     : docs.filter(d => d.doc_type === typeFilter);
 
   const grouped = {
-    passport:    filtered.filter(d => d.doc_type === 'passport'),
-    work_permit: filtered.filter(d => d.doc_type === 'work_permit'),
-    other:       filtered.filter(d => d.doc_type === 'other'),
+    passport:      filtered.filter(d => d.doc_type === 'passport'),
+    work_permit:   filtered.filter(d => d.doc_type === 'work_permit'),
+    ssic_gt:       filtered.filter(d => d.doc_type === 'ssic_gt'),
+    ssic_ht:       filtered.filter(d => d.doc_type === 'ssic_ht'),
+    security_bond: filtered.filter(d => d.doc_type === 'security_bond'),
+    other:         filtered.filter(d => d.doc_type === 'other'),
   };
 
   return (
@@ -491,8 +470,7 @@ export default function Documents() {
 
         <div className="dashboard-content">
 
-          {/* Notification banner */}
-          {isPriv && <NotificationBanner expiring={expiring} />}
+
 
           {/* Tabs */}
           {isPriv && (
@@ -571,7 +549,7 @@ export default function Documents() {
                 <>
                   {/* Summary + type filter */}
                   <div className="doc-summary-bar">
-                    {['all', 'passport', 'work_permit', 'other'].map(t => {
+                    {['all', 'passport', 'work_permit', 'ssic_gt', 'ssic_ht', 'security_bond', 'other'].map(t => {
                       const count = t === 'all' ? docs.length : docs.filter(d => d.doc_type === t).length;
                       const meta  = t === 'all' ? null : DOC_META[t];
                       return (
@@ -591,7 +569,7 @@ export default function Documents() {
                       <p>{docs.length === 0 ? 'No documents uploaded yet.' : 'No documents match the filter.'}</p>
                     </div>
                   ) : (
-                    ['passport', 'work_permit', 'other'].map(type => {
+                    ['passport', 'work_permit', 'ssic_gt', 'ssic_ht', 'security_bond', 'other'].map(type => {
                       const group = grouped[type];
                       if (group.length === 0) return null;
                       const meta = DOC_META[type];

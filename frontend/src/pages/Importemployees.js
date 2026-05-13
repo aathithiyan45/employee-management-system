@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { logout } from "../axiosInstance";
+import api from "../axiosInstance";
+import Sidebar from "../components/Sidebar";
 import "./Importemployees.css";
 
 // ── Icons ─────────────────────────────────────────────────
@@ -17,7 +18,7 @@ const ALL_COLS = [
   { col: "IS_ACTIVE",                 required: false, note: "1=Active, 0=Inactive (defaults to 1)" },
   { col: "COMPANY",                   required: false },
   { col: "NAME",                      required: false },
-  { col: "EMAIL",                     required: true,  note: "Required for invitation email" },
+  { col: "EMAIL",                     required: false, note: "Optional contact email" },
   { col: "HP NUMBER",                 required: false },
   { col: "NATIONALITY",               required: false },
   { col: "D.O.B",                     required: false },
@@ -49,7 +50,6 @@ const ALL_COLS = [
   { col: "ACCOMODATION",              required: false },
   { col: "PCP STATUS",                required: false },
   { col: "REMARKS",                   required: false },
-  { col: "SEND_EMAIL",                required: false, note: "1=Send invite, 0=Skip (overrides checkbox)" },
 ];
 
 // ── Upload Panel ──────────────────────────────────────────
@@ -60,7 +60,6 @@ function UploadPanel({ onSuccess }) {
   const [result, setResult]       = useState(null);
   const [errorMsg, setErrorMsg]   = useState("");
   const [dragOver, setDragOver]   = useState(false);
-  const [sendEmail, setSendEmail] = useState(true);
   const inputRef = useRef();
 
   const handleFile = (f) => {
@@ -102,12 +101,9 @@ function UploadPanel({ onSuccess }) {
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("send_email", sendEmail);
 
     try {
-      const res = await api.post("import/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post("import/", formData);
 
 
       setStatus("processing");
@@ -147,42 +143,7 @@ function UploadPanel({ onSuccess }) {
         )}
       </div>
 
-      {/* IS_ACTIVE info banner */}
-      <div className="active-info-banner">
-        <Icon
-          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-          size={15}
-        />
-        <span>
-          <strong>IS_ACTIVE column:</strong> Use <code>1</code> or <code>Y</code> for active,{" "}
-          <code>0</code> or <code>N</code> for inactive. If column is missing, all rows default to{" "}
-          <strong>Active</strong>.
-        </span>
-      </div>
 
-      {/* Email Requirement Box */}
-      <div className="active-info-banner" style={{ background: "#f0f9ff", borderColor: "#bae6fd", color: "#0369a1" }}>
-        <Icon
-          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-          size={15}
-          stroke="#0369a1"
-        />
-        <span>
-          <strong>Email Invitation:</strong> New employees will receive an <strong>email invitation</strong> to set their password securely. No passwords are generated or stored by the system. <strong>EMAIL</strong> is required for all new entries.
-        </span>
-      </div>
-
-      {/* Security Info Box */}
-      <div className="active-info-banner" style={{ background: "#fdf2f8", borderColor: "#fbcfe8", color: "#9d174d" }}>
-        <Icon
-          d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
-          size={15}
-          stroke="#9d174d"
-        />
-        <span>
-          <strong>Security:</strong> Employees set their own password using a secure, time-limited link. This ensures maximum privacy and compliance.
-        </span>
-      </div>
 
       {/* Expected columns */}
       <div className="expected-cols">
@@ -271,20 +232,6 @@ function UploadPanel({ onSuccess }) {
             </div>
           </div>
 
-          <div className="email-toggle-container">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={sendEmail}
-                onChange={(e) => setSendEmail(e.target.checked)}
-              />
-              <span className="checkbox-text">Send Email Invitations to New Employees</span>
-            </label>
-            <p className="checkbox-help">
-              If checked, new employees will receive a secure link to set their password.
-            </p>
-          </div>
-
           <button className="upload-btn" onClick={handleUpload}>Start Import</button>
         </div>
       )}
@@ -355,80 +302,10 @@ function UploadPanel({ onSuccess }) {
 // ── Main Page ─────────────────────────────────────────────
 function ImportEmployees() {
   const navigate  = useNavigate();
-  const user      = JSON.parse(localStorage.getItem("user") || "{}");
-  const initials  = (user?.username || "A").slice(0, 2).toUpperCase();
-
-  const handleLogout = () => {
-    logout();
-  };
 
   return (
     <div className="dashboard-shell">
-
-      {/* ══ SIDEBAR ══ */}
-      <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-              stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </div>
-          <div className="sidebar-brand-name">HR Portal</div>
-          <div className="sidebar-brand-sub">Admin Dashboard</div>
-        </div>
-
-        <nav className="sidebar-nav">
-          <div className="sidebar-section-label">Main</div>
-          <button className="sidebar-link" onClick={() => navigate("/dashboard")}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
-            </svg>
-            Dashboard
-          </button>
-          <button className="sidebar-link" onClick={() => navigate("/employees")}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            Employees
-          </button>
-          <button className="sidebar-link active">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
-            </svg>
-            Import Data
-          </button>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">{initials}</div>
-            <div className="sidebar-user-info">
-              <div className="sidebar-user-name">{user?.username || "Admin"}</div>
-              <div className="sidebar-user-role">Administrator</div>
-            </div>
-          </div>
-          <button className="sidebar-logout" onClick={handleLogout}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            Sign Out
-          </button>
-        </div>
-      </aside>
+      <Sidebar />
 
       {/* ══ MAIN ══ */}
       <div className="dashboard-main">
@@ -454,9 +331,7 @@ function ImportEmployees() {
               Upload a single Excel file containing all employees. Use the{" "}
               <strong>IS_ACTIVE</strong> column to mark active (<code>1</code>) or
               inactive (<code>0</code>) employees. Existing records are{" "}
-              <strong>updated</strong> by EMP ID — never duplicated.{" "}
-              <strong>New employees</strong> receive an email invitation to set their
-              password securely.
+              <strong>updated</strong> by EMP ID — never duplicated.
             </p>
           </div>
 
@@ -464,58 +339,7 @@ function ImportEmployees() {
             <UploadPanel />
           </div>
 
-          {/* Info notes */}
-          <div className="import-notes">
-            <div className="import-note">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>
-                <strong>EMP ID</strong> is the only required column. All other columns
-                are optional and will be skipped if missing.
-              </span>
-            </div>
-            <div className="import-note">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>
-                <strong>COMPANY</strong> column maps to Division. Valid values: PDS ENG,
-                GSI ENG, PDS MARINE, PDS OFFSHORE, GSI MARINE. Unknown values are
-                created automatically.
-              </span>
-            </div>
-            <div className="import-note">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>
-                <strong>Security:</strong> Employees set their own password using a
-                secure, time-limited link. No passwords are ever stored in Excel files.
-              </span>
-            </div>
-            <div className="import-note">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <span>
-                <strong>DATE JOINED</strong> drives the auto-calculated{" "}
-                <strong>Experience Years</strong> field — no manual entry needed.
-              </span>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>

@@ -45,6 +45,10 @@ class VersionedJWTAuthentication(JWTAuthentication):
         if token_version != user.token_version:
             raise InvalidToken("Token is invalid (session expired, password changed, or logged out).")
             
+        if user.role not in ('admin', 'hr'):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Employee portal has been disabled. This system is for internal HR use only.")
+            
         return user
 
 
@@ -73,6 +77,10 @@ def get_versioned_refresh_view():
             user_id = refresh.payload.get('user_id')
             from apps.employees.models import User
             user = User.objects.get(id=user_id)
+            
+            if user.role not in ('admin', 'hr'):
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Employee portal has been disabled. This system is for internal HR use only.")
             
             access = VersionedAccessToken.for_user(user)
             data['access'] = str(access)

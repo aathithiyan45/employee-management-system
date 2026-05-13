@@ -1,12 +1,13 @@
 from django.db.models import Count, Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from apps.accounts.permissions import IsAdminOrHR
 from rest_framework.response import Response
 from .models import Employee, Division
 from datetime import date, timedelta
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_analytics_summary(request):
     """
     General summary KPIs for employee demographics.
@@ -32,25 +33,25 @@ def employee_analytics_summary(request):
     })
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_by_division(request):
     data = Division.objects.annotate(value=Count('employees')).values('name', 'value').order_by('-value')
     return Response(list(data))
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_by_nationality(request):
     res = Employee.objects.values('nationality').annotate(count_val=Count('id')).order_by('-count_val')[:10]
     return Response([{"name": x['nationality'] or "Unknown", "value": x['count_val']} for x in res])
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_by_designation(request):
-    res = Employee.objects.values('designation_aug').annotate(value=Count('id')).order_by('-value')[:10]
-    return Response([{"name": x['designation_aug'] or "Unknown", "value": x['value']} for x in res])
+    res = Employee.objects.values('designation_ipa').annotate(value=Count('id')).order_by('-value')[:10]
+    return Response([{"name": x['designation_ipa'] or "Unknown", "value": x['value']} for x in res])
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_hiring_trend(request):
     """
     Number of employees joined per year for the last 5 years.
@@ -67,7 +68,7 @@ def employee_hiring_trend(request):
     return Response(data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_expiry_alerts(request):
     """
     Counts of documents expiring in 30, 60, 90 days.

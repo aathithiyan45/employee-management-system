@@ -69,6 +69,7 @@ function Dashboard() {
     inactive_employees:  0,
     wp_expiring:         0,
     passport_expiring:   0,
+    ssic_gt_expiring:    0,
     incomplete_profiles: 0,
   });
 
@@ -239,8 +240,9 @@ function Dashboard() {
       case "Total Employees":    return {};
       case "Active":             return { status: "active" };
       case "Inactive":           return { status: "inactive" };
-      case "WP Expiring":        return { expiry_alert: "wp" };
-      case "Passport Expiring":  return { expiry_alert: "passport" };
+      case "WP Expiring":        return { doc_type: "wp", days: "60" };
+      case "Passport Expiring":  return { doc_type: "passport", days: "90" };
+      case "SSIC GT Expiring":   return { doc_type: "ssic_gt", days: "60" };
       case "Incomplete Profiles":return { incomplete: "true" };
       default:                   return {};
     }
@@ -283,6 +285,12 @@ function Dashboard() {
       value:    data.passport_expiring,
       type:     "teal",
       iconPath: "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z",
+    },
+    {
+      label:    "SSIC GT Expiring",
+      value:    data.ssic_gt_expiring,
+      type:     "indigo",
+      iconPath: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
     },
     {
       label:    "Incomplete Profiles",

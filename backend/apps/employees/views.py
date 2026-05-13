@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from apps.accounts.permissions import IsAdminOrHR
 from rest_framework.response import Response
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.throttling import AnonRateThrottle
@@ -118,7 +119,7 @@ def generate_password(length=10):
 # ─────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def dashboard_view(request):
     division_name = request.GET.get("division")
 
@@ -149,6 +150,10 @@ def dashboard_view(request):
         passport_expiry__range=(today, next_90_days)
     ).count()
 
+    ssic_gt_expiring = active_employees.filter(
+        ssic_gt_exp__range=(today, next_60_days)
+    ).count()
+
     incomplete_profiles = employees.filter(
         Q(phone__isnull=True)          | Q(phone="") |
         Q(nationality__isnull=True)    | Q(nationality="") |
@@ -164,74 +169,8 @@ def dashboard_view(request):
         "inactive_employees":  inactive,
         "wp_expiring":         wp_expiring,
         "passport_expiring":   passport_expiring,
+        "ssic_gt_expiring":    ssic_gt_expiring,
         "incomplete_profiles": incomplete_profiles,
-    })
-
-
-# ─────────────────────────────────────────────
-# EMPLOYEE DASHBOARD
-# ─────────────────────────────────────────────
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def employee_dashboard_view(request):
-    if not hasattr(request.user, 'employee_profile'):
-        return Response({"error": "Unauthorized. Employee profile not found."}, status=403)
-    
-    if request.user.role != "employee":
-        return Response({"error": "Forbidden. Only employees can access this dashboard."}, status=403)
-
-    emp = request.user.employee_profile
-    today = date.today()
-
-    # Get Leave Balance
-    try:
-        balance = LeaveBalance.objects.get(employee=emp, year=today.year)
-        leave_balance_remaining = balance.annual_remaining + balance.casual_remaining + balance.medical_remaining
-    except LeaveBalance.DoesNotExist:
-        leave_balance_remaining = 0
-
-    # Get Pending Requests Count
-    pending_requests = LeaveRequest.objects.filter(employee=emp, status=LeaveRequest.STATUS_PENDING).count()
-
-    # Get Upcoming Leaves
-    upcoming_leaves = LeaveRequest.objects.filter(
-        employee=emp, 
-        status=LeaveRequest.STATUS_APPROVED, 
-        start_date__gte=today
-    ).count()
-
-    # Recent leaves (limit 5)
-    recent_leaves_qs = LeaveRequest.objects.filter(employee=emp).order_by('-created_at')[:5]
-    recent_leaves = [
-        {
-            "id": lr.id,
-            "type": lr.get_leave_type_display(),
-            "start_date": lr.start_date,
-            "end_date": lr.end_date,
-            "total_days": lr.total_days,
-            "status": lr.get_status_display()
-        }
-        for lr in recent_leaves_qs
-    ]
-
-    return Response({
-        "user": {
-            "name": emp.name,
-            "emp_id": emp.emp_id,
-            "role": emp.designation_aug or emp.designation_ipa or "Employee",
-            "division": emp.division.name if emp.division else "N/A"
-        },
-        "summary": {
-            "leave_balance": leave_balance_remaining,
-            "pending_requests": pending_requests,
-            "upcoming_leaves": upcoming_leaves
-        },
-        "documents": {
-            "passport_expiring": emp.passport_expiring_soon,
-            "wp_expiring": emp.wp_expiring_soon
-        },
-        "recent_leaves": recent_leaves
     })
 
 
@@ -311,7 +250,7 @@ def validate_upload(file, allowed_extensions, allowed_magic, max_bytes):
 # ─────────────────────────────────────────────
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def import_excel(request):
     """
     Asynchronous Excel import with progress tracking.
@@ -398,7 +337,7 @@ def import_excel(request):
     }, status=202)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def import_status(request, job_id):
     """
     Poll the status of an import job.
@@ -434,7 +373,7 @@ def import_status(request, job_id):
 # ─────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def get_divisions(request):
     divisions = Division.objects.filter(is_active=True).values("id", "name")
     return Response(list(divisions))
@@ -445,7 +384,7 @@ def get_divisions(request):
 # ─────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_list(request):
     division     = request.GET.get("division")
     status       = request.GET.get("status")
@@ -453,6 +392,8 @@ def employee_list(request):
     designation  = request.GET.get("designation")
     nationality  = request.GET.get("nationality")
     expiry_alert = request.GET.get("expiry_alert")
+    days_param   = request.GET.get("days")
+    doc_type     = request.GET.get("doc_type")
     joined_from  = request.GET.get("joined_from")
     joined_to    = request.GET.get("joined_to")
     incomplete   = request.GET.get("incomplete")
@@ -480,15 +421,28 @@ def employee_list(request):
         )
     if nationality:
         employees = employees.filter(nationality__icontains=nationality)
-    if expiry_alert:
-        today   = date.today()
-        next_60 = today + timedelta(days=60)
-        next_90 = today + timedelta(days=90)
+    if expiry_alert or doc_type:
+        today = date.today()
         employees = employees.filter(is_active=True)
-        if expiry_alert == "wp":
-            employees = employees.filter(wp_expiry__range=(today, next_60))
-        elif expiry_alert == "passport":
-            employees = employees.filter(passport_expiry__range=(today, next_90))
+
+        try:
+            days = int(days_param) if days_param else (90 if expiry_alert == "passport" else 60)
+        except ValueError:
+            days = 60
+
+        target_date = today + timedelta(days=days)
+        dtype = doc_type or expiry_alert
+
+        if dtype == "wp":
+            employees = employees.filter(wp_expiry__range=(today, target_date))
+        elif dtype == "passport":
+            employees = employees.filter(passport_expiry__range=(today, target_date))
+        elif dtype == "ssic_gt":
+            employees = employees.filter(ssic_gt_exp__range=(today, target_date))
+        elif dtype == "ssic_ht":
+            employees = employees.filter(ssic_ht_exp__range=(today, target_date))
+        elif dtype == "security_bond":
+            employees = employees.filter(security_bond_exp__range=(today, target_date))
     if joined_from:
         employees = employees.filter(date_joined_company__gte=joined_from)
     if joined_to:
@@ -515,7 +469,7 @@ def employee_list(request):
             "emp_id":           e.emp_id,
             "name":             e.name,
             "phone":            e.phone,
-            "designation":      e.designation_aug,
+            "designation":      e.designation_ipa,
             "division":         e.division.name,
             "status":           "Active" if e.is_active else "Inactive",
             # Salary is sensitive — only admin/hr can see it
@@ -536,7 +490,7 @@ def employee_list(request):
 # ─────────────────────────────────────────────
 
 @api_view(['GET', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def employee_detail(request, emp_id):
     try:
         e = Employee.objects.select_related("division").get(emp_id=emp_id)
@@ -556,16 +510,7 @@ def employee_detail(request, emp_id):
         return Response({"message": "Employee deleted successfully", "employee": emp_info})
 
     # GET — enforce access control
-    is_privileged = request.user.role in ('admin', 'hr')
-    viewer_profile = getattr(request.user, 'employee_profile', None)
-    is_own_profile = (
-        request.user.role == 'employee'
-        and viewer_profile is not None
-        and viewer_profile.emp_id == emp_id
-    )
-
-    # Regular employees may only view their own record
-    if not is_privileged and not is_own_profile:
+    if request.user.role not in ('admin', 'hr'):
         return Response({"error": "Permission denied"}, status=403)
 
     # Base fields — safe for all authenticated users who pass the access check
@@ -625,13 +570,12 @@ def employee_detail(request, emp_id):
     }
 
     # Sensitive financial fields — admin and HR only
-    if is_privileged:
-        response_data.update({
-            "ipa_salary":   e.ipa_salary,
-            "per_hr":       e.per_hr,
-            "salary":       e.salary,
-            "bank_account": e.bank_account,
-        })
+    response_data.update({
+        "ipa_salary":   e.ipa_salary,
+        "per_hr":       e.per_hr,
+        "salary":       e.salary,
+        "bank_account": e.bank_account,
+    })
 
     return Response(response_data)
 
@@ -641,7 +585,7 @@ def employee_detail(request, emp_id):
 # ─────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def export_employees(request):
     # Export contains salary and bank data — admin and HR only
     if request.user.role not in ('admin', 'hr'):
@@ -704,7 +648,7 @@ def export_employees(request):
 # ─────────────────────────────────────────────
 
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def update_employee(request, emp_id):
     # Fix IDOR: only admin or HR may update any employee record
     if request.user.role not in ('admin', 'hr'):

@@ -152,6 +152,41 @@
   transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
 
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input {
+  padding-right: 44px !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--grey-400);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.password-toggle-btn:hover {
+  color: var(--blue-600);
+  background-color: rgba(25, 118, 210, 0.05);
+}
+
+.password-toggle-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
 .login-field input:focus {
   outline: none;
   border-color: var(--blue-600);

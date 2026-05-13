@@ -226,6 +226,110 @@
 }
 
 /* ── Responsive ────────────────────────────────────────────────────────────── */
+/* ── Buttons ─────────────────────────────────────────────────── */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.action-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Primary Action (Create/Update) */
+.btn-primary {
+  background: linear-gradient(135deg, var(--blue-600), var(--blue-700));
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--blue-700), var(--blue-800));
+  box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}
+
+/* Success Action (Export/Paid) */
+.btn-success {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.2);
+}
+
+.btn-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #15803d, #166534);
+  box-shadow: 0 10px 15px -3px rgba(22, 163, 74, 0.3);
+}
+
+.btn-cancel {
+  background: var(--white);
+  color: var(--grey-700);
+  border: 1.5px solid var(--grey-200);
+}
+
+.btn-cancel:hover {
+  background: var(--grey-50);
+  border-color: var(--grey-300);
+  color: var(--grey-900);
+}
+
+.btn-filter-clear {
+  background: var(--grey-100);
+  color: var(--grey-700);
+  border: 1px solid var(--grey-200);
+  padding: 8px 16px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-filter-clear:hover {
+  background: var(--grey-200);
+  color: var(--grey-900);
+}
+
+/* Table Row Actions */
+.btn-row-edit {
+  color: var(--blue-600);
+  background: var(--blue-50);
+  border: 1px solid var(--blue-100);
+}
+.btn-row-edit:hover {
+  background: var(--blue-600);
+  color: white;
+  border-color: var(--blue-600);
+}
+
+.btn-row-delete {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid rgba(198, 40, 40, 0.1);
+}
+.btn-row-delete:hover {
+  background: var(--danger);
+  color: white;
+  border-color: var(--danger);
+}
+
 @media (max-width: 992px) {
   .invoices-top-bar { flex-direction: column; align-items: stretch; }
   .search-wrapper { max-width: none; }

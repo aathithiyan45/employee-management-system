@@ -7,8 +7,6 @@ import HRDashboard    from "./pages/HRDashboard";
 import EmployeeList   from "./pages/EmployeeList";
 import EmployeeDetail from "./pages/EmployeeDetail";
 import EmployeeProfile from "./pages/EmployeeProfile";
-import EmployeeDashboard from "./pages/EmployeeDashboard";
-import Profile        from "./components/Profile";
 import ImportEmployees from "./pages/Importemployees";
 import LeaveManagement from "./pages/LeaveManagement";
 import LeaveBalance   from "./pages/LeaveBalance";
@@ -85,14 +83,6 @@ function App() {
         {/* ── HR only ─────────────────────────────────────── */}
         <Route path="/hr/dashboard" element={
           <PrivateRoute requiredRole="hr"><HRDashboard /></PrivateRoute>
-        } />
-
-        {/* ── Employee only ────────────────────────────────── */}
-        <Route path="/employee/dashboard" element={
-          <PrivateRoute requiredRole="employee"><EmployeeDashboard /></PrivateRoute>
-        } />
-        <Route path="/profile" element={
-          <PrivateRoute requiredRole="employee"><Profile /></PrivateRoute>
         } />
 
         {/* ── Authenticated — any role ─────────────────────── */}

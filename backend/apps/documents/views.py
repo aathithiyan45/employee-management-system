@@ -4,6 +4,7 @@ from django.conf import settings
 from django.http import FileResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from apps.accounts.permissions import IsAdminOrHR
 from rest_framework.response import Response
 
 from apps.employees.models import Employee
@@ -24,25 +25,18 @@ DOCUMENT_MAX_BYTES = 10 * 1024 * 1024   # 10 MB
 
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def document_list_upload(request, emp_id):
     """
     GET  /api/documents/<emp_id>/  — list all documents for an employee
     POST /api/documents/<emp_id>/  — upload a new document (admin/hr only)
-
-    Employees can GET their own documents only.
-    Admin/HR can GET and POST for any employee.
     """
     try:
         emp = Employee.objects.get(emp_id=emp_id)
     except Employee.DoesNotExist:
         return Response({'error': 'Employee not found.'}, status=404)
 
-    is_privileged = request.user.role in ('admin', 'hr')
-    is_own        = hasattr(request.user, 'employee_profile') and \
-                    request.user.employee_profile.emp_id == emp_id
-
-    if not (is_privileged or is_own):
+    if request.user.role not in ('admin', 'hr'):
         return Response({'error': 'Forbidden.'}, status=403)
 
     # ── GET ──────────────────────────────────────────────────
@@ -69,9 +63,6 @@ def document_list_upload(request, emp_id):
         return Response(data)
 
     # ── POST (admin/hr only) ──────────────────────────────────
-    if not is_privileged:
-        return Response({'error': 'Only admin/HR can upload documents.'}, status=403)
-
     file      = request.FILES.get('file')
     doc_type  = request.data.get('doc_type', '')
     label     = request.data.get('label', '')
@@ -80,8 +71,8 @@ def document_list_upload(request, emp_id):
 
     if not file:
         return Response({'error': 'No file uploaded.'}, status=400)
-    if doc_type not in ('passport', 'work_permit', 'other'):
-        return Response({'error': 'Invalid doc_type.'}, status=400)
+    if doc_type not in ('passport', 'work_permit', 'ssic_gt', 'ssic_ht', 'security_bond', 'other'):
+        return Response({'error': f'Invalid doc_type: {doc_type}'}, status=400)
 
     # Reuse the existing 3-layer validate_upload for security
     ok, err = validate_upload(
@@ -108,6 +99,23 @@ def document_list_upload(request, emp_id):
             uploaded_by = request.user,
             notes       = notes,
         )
+
+        # ── SYNC TO EMPLOYEE RECORD ───────────────────────────
+        # If the document has an expiry date, sync it back to the Employee model's primary fields.
+        if expiry:
+            if doc_type == 'passport':
+                emp.passport_expiry = expiry
+            elif doc_type == 'work_permit':
+                emp.wp_expiry = expiry
+            elif doc_type == 'ssic_gt':
+                emp.ssic_gt_exp = expiry
+            elif doc_type == 'ssic_ht':
+                emp.ssic_ht_exp = expiry
+            elif doc_type == 'security_bond':
+                emp.security_bond_exp = expiry
+            
+            emp.save()
+
     except Exception as e:
         return Response({'error': f"Failed to save document: {str(e)}"}, status=500)
 
@@ -121,7 +129,7 @@ def document_list_upload(request, emp_id):
 
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def document_delete(request, pk):
     """DELETE /api/documents/<pk>/delete/  — admin/hr only"""
     if request.user.role not in ('admin', 'hr'):
@@ -162,23 +170,19 @@ def document_delete(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def document_download(request, pk):
     """
     GET /api/documents/<pk>/download/
     Serves the file as an attachment.
-    Employees can only download their own docs; admin/hr can download any.
+    Admin/HR only.
     """
     try:
         doc = EmployeeDocument.objects.select_related('employee__user').get(pk=pk)
     except EmployeeDocument.DoesNotExist:
         return Response({'error': 'Document not found.'}, status=404)
 
-    is_privileged = request.user.role in ('admin', 'hr')
-    is_own        = hasattr(request.user, 'employee_profile') and \
-                    request.user.employee_profile == doc.employee
-
-    if not (is_privileged or is_own):
+    if request.user.role not in ('admin', 'hr'):
         return Response({'error': 'Forbidden.'}, status=403)
 
     if not os.path.isfile(doc.file.path):
@@ -195,7 +199,7 @@ def document_download(request, pk):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def documents_expiring(request):
     """
     GET /api/documents/expiring/
@@ -228,7 +232,7 @@ def documents_expiring(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def document_audit_log(request):
     """
     GET /api/documents/audit/?emp_id=EMP001
@@ -257,23 +261,19 @@ def document_audit_log(request):
 
     return Response(data)
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def document_preview(request, pk):
     """
     GET /api/documents/<pk>/preview/
     Serves the file for browser viewing (inline).
-    Enforces same permissions as download.
+    Admin/HR only.
     """
     try:
         doc = EmployeeDocument.objects.select_related('employee__user').get(pk=pk)
     except EmployeeDocument.DoesNotExist:
         return Response({'error': 'Document not found.'}, status=404)
 
-    is_privileged = request.user.role in ('admin', 'hr')
-    is_own        = hasattr(request.user, 'employee_profile') and \
-                    request.user.employee_profile == doc.employee
-
-    if not (is_privileged or is_own):
+    if request.user.role not in ('admin', 'hr'):
         return Response({'error': 'Forbidden.'}, status=403)
 
     if not os.path.isfile(doc.file.path):

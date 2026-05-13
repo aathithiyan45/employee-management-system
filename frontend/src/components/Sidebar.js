@@ -60,19 +60,8 @@ const HR_NAV = [
   },
 ];
 
-const EMPLOYEE_NAV = [
-  {
-    label: "Main",
-    links: [
-      { path: "/employee/dashboard", label: "Dashboard",    icon: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" },
-      { path: "/profile",            label: "My Profile",   icon: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" },
-      { path: "/documents",          label: "My Documents", icon: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h4" },
-    ],
-  },
-];
-
-const NAV_BY_ROLE = { admin: ADMIN_NAV, hr: HR_NAV, employee: EMPLOYEE_NAV };
-const SUBTITLE_BY_ROLE = { admin: "Admin Dashboard", hr: "HR Portal", employee: "Employee Portal" };
+const NAV_BY_ROLE = { admin: ADMIN_NAV, hr: HR_NAV };
+const SUBTITLE_BY_ROLE = { admin: "Admin Dashboard", hr: "HR Portal" };
 
 // ── Sidebar ───────────────────────────────────────────────
 function Sidebar() {
@@ -80,10 +69,10 @@ function Sidebar() {
   const location  = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const user      = JSON.parse(localStorage.getItem("user") || "{}");
-  const role      = user?.role || "employee";
+  const role      = user?.role || "hr";
   const initials  = (user?.username || "U").slice(0, 2).toUpperCase();
-  const sections  = NAV_BY_ROLE[role] || EMPLOYEE_NAV;
-  const subtitle  = SUBTITLE_BY_ROLE[role] || "Portal";
+  const sections  = NAV_BY_ROLE[role] || HR_NAV;
+  const subtitle  = SUBTITLE_BY_ROLE[role] || "HR Portal";
 
   const handleLogout = () => logout();
 
@@ -116,12 +105,12 @@ function Sidebar() {
           <div className="sidebar-brand-icon">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
               stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
             </svg>
           </div>
-          <div className="sidebar-brand-name">HR <span style={{ color: "var(--teal-400)" }}>Portal</span></div>
+          <div className="sidebar-brand-name">Workforce <span style={{ color: "var(--teal-400)" }}>System</span></div>
           <div className="sidebar-brand-sub">{subtitle}</div>
         </div>
 

@@ -1,6 +1,7 @@
 from django.db.models import Count, Q, Avg, F
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from apps.accounts.permissions import IsAdminOrHR
 from rest_framework.response import Response
 from .models import LeaveRequest
 from apps.employees.models import Division
@@ -8,7 +9,7 @@ from datetime import date, timedelta
 import calendar
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_analytics_summary(request):
     """
     General summary KPIs for leave requests.
@@ -35,7 +36,7 @@ def leave_analytics_summary(request):
     })
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_by_type(request):
     year = int(request.GET.get('year', date.today().year))
     res = LeaveRequest.objects.filter(start_date__year=year).values('leave_type').annotate(value=Count('id')).order_by('-value')
@@ -47,7 +48,7 @@ def leave_by_type(request):
     return Response(data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_by_month(request):
     year = int(request.GET.get('year', date.today().year))
     data = []
@@ -62,7 +63,7 @@ def leave_by_month(request):
     return Response(data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_by_division(request):
     year = int(request.GET.get('year', date.today().year))
     data = Division.objects.annotate(
@@ -72,7 +73,7 @@ def leave_by_division(request):
     return Response(list(data))
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def leave_status_breakdown(request):
     year = int(request.GET.get('year', date.today().year))
     res = LeaveRequest.objects.filter(start_date__year=year).values('status').annotate(value=Count('id'))

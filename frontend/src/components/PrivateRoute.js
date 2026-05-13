@@ -4,7 +4,6 @@ import { Navigate } from "react-router-dom";
 const ROLE_HOME = {
   admin:    "/dashboard",
   hr:       "/hr/dashboard",
-  employee: "/employee/dashboard",
 };
 
 /**

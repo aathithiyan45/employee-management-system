@@ -35,9 +35,8 @@ SAFE_EMPLOYEE_FIELDS = [
 
 class EmployeeSerializer(serializers.ModelSerializer):
     """
-    Read-only serializer for non-privileged contexts (e.g. employee self-view,
-    public directory listings). Salary, bank details, and identity document
-    numbers are explicitly excluded.
+    Read-only serializer for non-privileged contexts (e.g. public directory listings).
+    Salary, bank details, and identity document numbers are explicitly excluded.
 
     For admin/HR responses that need salary data, build the response dict
     manually in the view with an is_privileged check — do NOT add sensitive

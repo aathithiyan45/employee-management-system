@@ -398,6 +398,9 @@
 .stat-card.orange::after {
   background: var(--orange-500);
 }
+.stat-card.indigo::after {
+  background: #6366f1;
+}
 
 .stat-card-icon {
   width: 40px;
@@ -433,6 +436,9 @@
 .stat-card.orange .stat-card-icon {
   background: var(--orange-100);
 }
+.stat-card.indigo .stat-card-icon {
+  background: #eef2ff;
+}
 
 .stat-card-icon svg {
   width: 20px;
@@ -461,6 +467,9 @@
 
 .stat-card.orange .stat-card-icon svg {
   stroke: var(--orange-600);
+}
+.stat-card.indigo .stat-card-icon svg {
+  stroke: #4f46e5;
 }
 
 /* ════════════════════════════════
@@ -564,6 +573,9 @@
 
 .stat-card.orange .stat-card-value {
   color: var(--orange-600);
+}
+.stat-card.indigo .stat-card-value {
+  color: #4338ca;
 }
 
 /* Clickable cards */

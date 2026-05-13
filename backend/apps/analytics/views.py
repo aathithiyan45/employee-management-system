@@ -6,6 +6,7 @@ from django.db.models import Count, Q
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from apps.accounts.permissions import IsAdminOrHR
 from rest_framework.response import Response
 
 from apps.employees.models import Employee
@@ -16,7 +17,7 @@ from .models import AuditLog
 # ─────────────────────────────────────────────
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def chart_division_distribution(request):
     division_param = request.GET.get("division")
 
@@ -46,7 +47,7 @@ def chart_division_distribution(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def chart_monthly_growth(request):
     division_param = request.GET.get("division")
 
@@ -98,7 +99,7 @@ def chart_monthly_growth(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsAdminOrHR])
 def chart_designation_breakdown(request):
     division_param = request.GET.get("division")
 
@@ -109,15 +110,15 @@ def chart_designation_breakdown(request):
 
     designation_data = (
         employees
-        .exclude(designation_aug__isnull=True)
-        .exclude(designation_aug="")
-        .values('designation_aug')
+        .exclude(designation_ipa__isnull=True)
+        .exclude(designation_ipa="")
+        .values('designation_ipa')
         .annotate(count=Count('id'))
         .order_by('-count')[:10]
     )
 
     return Response({
-        'labels': [item['designation_aug'] for item in designation_data],
+        'labels': [item['designation_ipa'] for item in designation_data],
         'datasets': [{
             'data': [item['count'] for item in designation_data],
             'backgroundColor': [

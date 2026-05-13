@@ -269,5 +269,30 @@ input[type="month"].worklog-input {
   transform: translateY(0);
 }
 
+.btn-filter-clear {
+  background: var(--grey-100);
+  color: var(--grey-700);
+  border: 1px solid var(--grey-200);
+  padding: 8px 16px;
+  border-radius: 99px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-filter-clear:hover {
+  background: var(--grey-200);
+  color: var(--grey-900);
+  border-color: var(--grey-300);
+}
+
+.btn-filter-clear svg {
+  color: var(--grey-500);
+}
+
 
 

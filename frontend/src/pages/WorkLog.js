@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
+import SearchableSelect from "../components/SearchableSelect";
 import "./WorkLog.css";
 
 function WorkLog() {
@@ -54,8 +55,20 @@ function WorkLog() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleEmployeeSelect = (empId) => {
+    setFormData({ ...formData, employee: empId });
+  };
+
+  const handleFilterEmpSelect = (empId) => {
+    setFilterEmp(empId);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.employee) {
+      setError("Please select an employee");
+      return;
+    }
     setLoading(true);
     setError("");
     setSuccess("");
@@ -92,12 +105,15 @@ function WorkLog() {
             <form onSubmit={handleSubmit} className="worklog-form">
               <div className="form-group">
                 <label>Employee</label>
-                <select name="employee" value={formData.employee} onChange={handleChange} required className="worklog-select">
-                  <option value="">Select Employee</option>
-                  {employees.map(emp => (
-                    <option key={emp.emp_id} value={emp.emp_id}>{emp.emp_id} - {emp.name}</option>
-                  ))}
-                </select>
+                <SearchableSelect 
+                  options={employees}
+                  placeholder="Type ID or Name..."
+                  value={formData.employee}
+                  onSelect={handleEmployeeSelect}
+                  displayKey="name"
+                  valueKey="emp_id"
+                  subKey="emp_id"
+                />
               </div>
               <div className="form-group">
                 <label>Date</label>
@@ -128,23 +144,26 @@ function WorkLog() {
             </div>
             <div className="filter-group">
               <label>Filter by Employee:</label>
-              <select 
-                value={filterEmp} 
-                onChange={(e) => setFilterEmp(e.target.value)} 
-                className="worklog-select"
-              >
-                <option value="">All Employees</option>
-                {employees.map(emp => (
-                  <option key={emp.emp_id} value={emp.emp_id}>{emp.emp_id} - {emp.name}</option>
-                ))}
-              </select>
+              <div style={{ minWidth: "200px" }}>
+                <SearchableSelect 
+                  options={employees}
+                  placeholder="All Employees"
+                  value={filterEmp}
+                  onSelect={handleFilterEmpSelect}
+                  displayKey="name"
+                  valueKey="emp_id"
+                  subKey="emp_id"
+                />
+              </div>
             </div>
             {(filterMonth || filterEmp) && (
               <button 
-                className="btn-clear" 
+                className="btn-filter-clear" 
                 onClick={() => { setFilterMonth(""); setFilterEmp(""); }}
-                style={{ background: "transparent", color: "var(--grey-600)", fontWeight: "600", fontSize: "13px", border: "none", cursor: "pointer" }}
               >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
                 Clear Filters
               </button>
             )}

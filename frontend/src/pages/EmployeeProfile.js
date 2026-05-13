@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
+import Toast from "../components/Toast";
 import "./EmployeeProfile.css";
 
 function EmployeeProfile() {
@@ -12,6 +13,12 @@ function EmployeeProfile() {
   const [editing, setEditing] = useState({});
   const [formData, setFormData] = useState({});
   const [user, setUser] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+  };
+
 
   const val = (v) => (v !== null && v !== undefined && v !== "" ? v : "—");
 
@@ -57,9 +64,10 @@ function EmployeeProfile() {
       await api.put(`employees/${empId}/update/`, updateData);
       setEmp({ ...emp, [field]: formData[field] });
       setEditing({ ...editing, [field]: false });
+      showToast(`${field} updated successfully`);
     } catch (error) {
       console.error("Error updating field:", error);
-      alert(`Failed to update ${field}`);
+      showToast(`Failed to update ${field}`, "error");
     }
   };
 
@@ -75,11 +83,11 @@ function EmployeeProfile() {
 
     try {
       await api.delete(`employees/${empId}/`);
-      alert("Employee deleted successfully");
-      navigate("/employees");
+      showToast("Employee deleted successfully");
+      setTimeout(() => navigate("/employees"), 1500);
     } catch (error) {
       console.error("Error deleting employee:", error);
-      alert("Failed to delete employee. Please try again.");
+      showToast("Failed to delete employee. Please try again.", "error");
     }
   };
 
@@ -482,6 +490,14 @@ function EmployeeProfile() {
           </Section>
         )}
       </div>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 }

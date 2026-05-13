@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
+import Toast from "../components/Toast";
 import "./EmployeeList.css";
 
 function EmployeeList() {
@@ -18,18 +19,27 @@ function EmployeeList() {
       "all",
   );
   const [divisions, setDivisions] = useState([]);
-  const [status, setStatus] = useState("");
+  const urlParams = new URLSearchParams(window.location.search);
+  const [status, setStatus] = useState(urlParams.get("status") || "");
   const [search, setSearch] = useState("");
   // Removed debouncedSearch
 
   // ── New filter states ──────────────────────────────────
   const [designation, setDesignation] = useState("");
   const [nationality, setNationality] = useState("");
-  const [expiryAlert, setExpiryAlert] = useState("");
+  const [docType, setDocType] = useState(urlParams.get("doc_type") || "");
+  const [expiryDays, setExpiryDays] = useState(urlParams.get("days") || "60");
+  const [tempDocType, setTempDocType] = useState(urlParams.get("doc_type") || "");
+  const [tempExpiryDays, setTempExpiryDays] = useState(urlParams.get("days") || "60");
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
-  const [incomplete, setIncomplete] = useState("");
+  const [incomplete, setIncomplete] = useState(urlParams.get("incomplete") || "");
   const [user, setUser] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+  };
 
   // Get user info from localStorage
   useEffect(() => {
@@ -40,20 +50,23 @@ function EmployeeList() {
   // ── Parse URL parameters on mount ──────────────────────
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-
     const divisionParam = urlParams.get("division");
     const statusParam = urlParams.get("status");
-    const expiryAlertParam = urlParams.get("expiry_alert");
+    const docTypeParam = urlParams.get("doc_type");
+    const daysParam = urlParams.get("days");
     const incompleteParam = urlParams.get("incomplete");
 
     // Set division from URL or default to "all"
-    if (divisionParam) {
-      setDivision(divisionParam);
-    } else {
-      setDivision("all");
-    }
+    if (divisionParam) setDivision(divisionParam);
     if (statusParam) setStatus(statusParam);
-    if (expiryAlertParam) setExpiryAlert(expiryAlertParam);
+    if (docTypeParam) {
+      setDocType(docTypeParam);
+      setTempDocType(docTypeParam);
+    }
+    if (daysParam) {
+      setExpiryDays(daysParam);
+      setTempExpiryDays(daysParam);
+    }
     if (incompleteParam) setIncomplete(incompleteParam);
   }, []);
 
@@ -73,7 +86,8 @@ function EmployeeList() {
           search: search,
           designation,
           nationality,
-          expiry_alert: expiryAlert,
+          doc_type: docType,
+          days: expiryDays,
           joined_from: joinedFrom,
           joined_to: joinedTo,
           incomplete,
@@ -96,7 +110,8 @@ function EmployeeList() {
     search,
     designation,
     nationality,
-    expiryAlert,
+    docType,
+    expiryDays,
     joinedFrom,
     joinedTo,
     incomplete,
@@ -118,10 +133,10 @@ function EmployeeList() {
       await api.delete(`employees/${empId}/`);
       // Refresh the employee list
       fetchEmployees();
-      alert("Employee deleted successfully");
+      showToast("Employee deleted successfully");
     } catch (error) {
       console.error("Error deleting employee:", error);
-      alert("Failed to delete employee. Please try again.");
+      showToast("Failed to delete employee. Please try again.", "error");
     }
   };
 
@@ -148,14 +163,23 @@ function EmployeeList() {
   }, [fetchEmployees]);
 
   const hasActiveFilters =
-    designation || nationality || expiryAlert || joinedFrom || joinedTo;
+    designation || nationality || docType || joinedFrom || joinedTo;
 
   const clearFilters = () => {
     setDesignation("");
     setNationality("");
-    setExpiryAlert("");
+    setDocType("");
+    setTempDocType("");
+    setExpiryDays("60");
+    setTempExpiryDays("60");
     setJoinedFrom("");
     setJoinedTo("");
+    setCurrentPage(1);
+  };
+  
+  const applyExpiryFilter = () => {
+    setDocType(tempDocType);
+    setExpiryDays(tempExpiryDays);
     setCurrentPage(1);
   };
 
@@ -226,14 +250,37 @@ function EmployeeList() {
               className="search-input"
             />
 
-            <select
-              value={expiryAlert}
-              onChange={(e) => setExpiryAlert(e.target.value)}
-            >
-              <option value="">All Expiry</option>
-              <option value="wp">WP Expiring (30d)</option>
-              <option value="passport">Passport Expiring (30d)</option>
-            </select>
+            <div className="expiry-filter-group">
+              <select
+                value={tempDocType}
+                onChange={(e) => setTempDocType(e.target.value)}
+                className="expiry-type-select"
+              >
+                <option value="">All Documents</option>
+                <option value="wp">Work Permit</option>
+                <option value="passport">Passport</option>
+                <option value="ssic_gt">SSIC GT</option>
+                <option value="ssic_ht">SSIC HT</option>
+                <option value="security_bond">Security Bond</option>
+              </select>
+              <div className="expiry-days-wrapper">
+                <span>Expiring in next</span>
+                <input
+                  type="number"
+                  value={tempExpiryDays}
+                  onChange={(e) => setTempExpiryDays(e.target.value)}
+                  className="expiry-days-input"
+                  min="1"
+                />
+                <span>days</span>
+              </div>
+              <button 
+                className="apply-expiry-btn"
+                onClick={applyExpiryFilter}
+              >
+                Check
+              </button>
+            </div>
           </div>
 
           {/* ── Date Range ── */}
@@ -347,7 +394,7 @@ function EmployeeList() {
                     <strong>{e.name}</strong>
                   </td>
                   <td className="text-center">{e.phone || "—"}</td>
-                  <td className="text-left">{e.designation || "—"}</td>
+                  <td className="text-left">{e.designation_ipa || e.designation || "—"}</td>
                   <td className="text-left">{e.division}</td>
                   <td className="text-center">
                     <span
@@ -408,6 +455,14 @@ function EmployeeList() {
             Next ›
           </button>
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

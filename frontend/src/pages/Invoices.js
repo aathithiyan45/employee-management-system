@@ -22,6 +22,7 @@ function Invoices() {
   const [uploading, setUploading] = useState(false);
 
   // Manual entry form
+  const [isEditing, setIsEditing] = useState(null);
   const [formData, setFormData] = useState({
     date: "",
     invoice_no: "",
@@ -84,27 +85,71 @@ function Invoices() {
     return (val - ret + gst).toFixed(2);
   };
 
+  const resetForm = () => {
+    setFormData({
+      date: "",
+      invoice_no: "",
+      client_number: "",
+      project_name: "",
+      work_order_no: "",
+      pr_no: "",
+      invoice_value: "",
+      retention: "",
+      gst: "",
+      retentionPct: "10",
+      gstPct: "18",
+    });
+    setIsEditing(null);
+  };
+
+  const handleEdit = (inv) => {
+    // Scroll to top to see the form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Calculate percentages for the form fields based on existing values
+    const invVal = parseFloat(inv.invoice_value) || 0;
+    const retVal = parseFloat(inv.retention) || 0;
+    const gstVal = parseFloat(inv.gst) || 0;
+    
+    const rPct = invVal > 0 ? (retVal / invVal * 100).toFixed(1) : "10";
+    const gPct = (invVal - retVal) > 0 ? (gstVal / (invVal - retVal) * 100).toFixed(1) : "18";
+
+    setFormData({
+      date: inv.date,
+      invoice_no: inv.invoice_no,
+      client_number: inv.client_number,
+      project_name: inv.project_name,
+      work_order_no: inv.work_order_no,
+      pr_no: inv.pr_no,
+      invoice_value: inv.invoice_value,
+      retention: inv.retention,
+      gst: inv.gst,
+      retentionPct: rPct,
+      gstPct: gPct,
+    });
+    setIsEditing(inv.id);
+    setSuccess(`Editing Invoice: ${inv.invoice_no}`);
+    setTimeout(() => setSuccess(""), 3000);
+  };
+
   const handleManualSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
     try {
-      await axiosInstance.post("invoices/", formData);
-      setSuccess("Invoice added successfully!");
-      setFormData({
-        date: "",
-        invoice_no: "",
-        client_number: "",
-        project_name: "",
-        work_order_no: "",
-        pr_no: "",
-        invoice_value: "",
-        retention: "",
-        gst: "",
-      });
+      if (isEditing) {
+        await axiosInstance.patch(`invoices/${isEditing}/`, formData);
+        setSuccess("Invoice updated successfully!");
+      } else {
+        await axiosInstance.post("invoices/", formData);
+        setSuccess("Invoice added successfully!");
+      }
+      resetForm();
       fetchInvoices();
     } catch (err) {
-      setError(err.response?.data?.invoice_no?.[0] || "Failed to add invoice");
+      console.error(err);
+      const msg = err.response?.data ? Object.values(err.response.data)[0] : "Failed to save invoice";
+      setError(Array.isArray(msg) ? msg[0] : msg);
     }
   };
 
@@ -134,9 +179,7 @@ function Invoices() {
     data.append("file", uploadFile);
 
     try {
-      const res = await axiosInstance.post("invoices/upload/", data, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      const res = await axiosInstance.post("invoices/upload/", data);
       if (res.data.errors && res.data.errors.length > 0) {
         setError(`Upload finished with errors: ${res.data.errors.join(", ")}`);
       } else {
@@ -217,9 +260,8 @@ function Invoices() {
           </div>
           <div className="header-right">
             <button 
-              className="action-btn" 
+              className="action-btn btn-success" 
               onClick={handleDownload}
-              style={{ background: "var(--success-bg)", color: "var(--success)", border: "1px solid rgba(46, 125, 50, 0.2)", display: "flex", alignItems: "center", gap: "8px", padding: "10px 20px", fontWeight: "600" }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
@@ -245,10 +287,9 @@ function Invoices() {
                   />
                 </div>
                 <button 
-                  className="action-btn" 
+                  className="action-btn btn-primary" 
                   onClick={handleFileUpload} 
                   disabled={uploading}
-                  style={{ background: "var(--blue-600)", color: "white", padding: "8px 20px" }}
                 >
                   {uploading ? "Uploading..." : "Upload Excel"}
                 </button>
@@ -273,10 +314,11 @@ function Invoices() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
-                Manual Invoice Entry
+                {isEditing ? `Edit Invoice: ${formData.invoice_no}` : "Manual Invoice Entry"}
               </h4>
               
               <form onSubmit={handleManualSubmit} className="entry-form">
+                {/* ... fields ... */}
                 <div className="form-field">
                   <label>Date</label>
                   <input required type="date" name="date" className="invoice-input" value={formData.date} onChange={handleInputChange} />
@@ -325,9 +367,14 @@ function Invoices() {
                     <input required type="number" step="0.01" name="gst" className="invoice-input" value={formData.gst} onChange={handleInputChange} />
                   </div>
                   
-                  <div className="form-field" style={{ justifyContent: "flex-end" }}>
-                    <button type="submit" className="action-btn" style={{ background: "var(--blue-600)", color: "white", padding: "12px", height: "44px", fontWeight: "600" }}>
-                      Create Invoice
+                  <div className="form-field" style={{ justifyContent: "flex-end", flexDirection: "row", gap: "10px" }}>
+                    {isEditing && (
+                      <button type="button" className="action-btn btn-cancel" onClick={resetForm}>
+                        Cancel
+                      </button>
+                    )}
+                    <button type="submit" className="action-btn btn-primary" style={{ minWidth: "160px" }}>
+                      {isEditing ? "Update Invoice" : "Create Invoice"}
                     </button>
                   </div>
                 </div>
@@ -373,13 +420,20 @@ function Invoices() {
                       <td className="val-pos">+${parseFloat(inv.gst).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                       <td className="val-total">${parseFloat(inv.total).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                       <td style={{ textAlign: "center" }}>
-                        <button 
-                          className="action-btn" 
-                          onClick={() => handleDelete(inv.id)}
-                          style={{ color: "var(--danger)", border: "1px solid var(--danger-bg)", background: "var(--danger-bg)", padding: "6px 12px", borderRadius: "6px", fontSize: "12px", fontWeight: "600" }}
-                        >
-                          Delete
-                        </button>
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                          <button 
+                            className="action-btn btn-row-edit" 
+                            onClick={() => handleEdit(inv)}
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            className="action-btn btn-row-delete" 
+                            onClick={() => handleDelete(inv.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))

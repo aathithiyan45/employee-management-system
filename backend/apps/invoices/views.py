@@ -33,23 +33,46 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             if len(df) > 2000:
                 return Response({"error": "File too large. Please limit to 2000 rows per upload."}, status=status.HTTP_400_BAD_REQUEST)
 
-            required_cols = ['Date', 'Invoice No', 'Client Number', 'Project Name', 'Work Order No', 'PR No', 'Invoice Value']
-            for col in required_cols:
-                if col not in df.columns:
-                    return Response({"error": f"Missing required column: {col}"}, status=status.HTTP_400_BAD_REQUEST)
+            # Flexible Column Mapping
+            df.columns = [str(c).strip() for c in df.columns]
+            
+            mapping = {
+                'date': ['Date', 'Invoice Date'],
+                'invoice_no': ['Invoice No', 'Invoice Number', 'Inv No'],
+                'client_number': ['Client Number', 'Client No', 'Client ID', 'Client'],
+                'project_name': ['Project Name', 'Project', 'Project Nam'],
+                'work_order_no': ['Work Order No', 'Work Order', 'WO No', 'WO'],
+                'pr_no': ['PR No', 'PR Number', 'PR'],
+                'invoice_value': ['Invoice Value', 'Value', 'Amount', 'Invoice Valu'],
+                'retention_pct': ['Retention %', 'Retention Pct'],
+                'gst_pct': ['GST %', 'GST Pct'],
+                'retention_amt': ['Retention', 'Retention Amount'],
+                'gst_amt': ['GST', 'GST Amount']
+            }
 
-            # 1. Pre-fetch existing invoice numbers for O(1) existence checks
+            col_map = {}
+            for field, aliases in mapping.items():
+                for alias in aliases:
+                    if alias in df.columns:
+                        col_map[field] = alias
+                        break
+            
+            mandatory = ['date', 'invoice_no', 'client_number', 'project_name', 'work_order_no', 'pr_no', 'invoice_value']
+            missing = [m.replace('_', ' ').title() for m in mandatory if m not in col_map]
+            
+            if missing:
+                return Response({"error": f"Missing required columns: {', '.join(missing)} (Check your Excel headers)"}, status=status.HTTP_400_BAD_REQUEST)
+
             existing_nos = set(Invoice.objects.values_list('invoice_no', flat=True))
             
             to_create = []
             errors = []
             success_count = 0
-            
             from decimal import Decimal
 
             for index, row in df.iterrows():
-                invoice_no = str(row['Invoice No']).strip()
-                if pd.isna(row['Invoice No']):
+                invoice_no = str(row[col_map['invoice_no']]).strip()
+                if pd.isna(row[col_map['invoice_no']]):
                     continue
                 
                 if invoice_no in existing_nos:
@@ -57,40 +80,46 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     continue
 
                 try:
-                    invoice_value = float(row['Invoice Value'])
-                    date_val = pd.to_datetime(row['Date']).date()
+                    invoice_value = float(row[col_map['invoice_value']])
+                    date_val = pd.to_datetime(row[col_map['date']]).date()
                 except (ValueError, TypeError, Exception):
                     errors.append(f"Row {index + 2}: Invalid Invoice Value or Date format.")
                     continue
 
-                retention = row.get('Retention')
-                if pd.isna(retention):
-                    retention = round(invoice_value * 0.10, 2)
+                # Retention
+                ret_val = None
+                if 'retention_amt' in col_map and not pd.isna(row[col_map['retention_amt']]):
+                    ret_val = Decimal(str(row[col_map['retention_amt']]))
+                elif 'retention_pct' in col_map and not pd.isna(row[col_map['retention_pct']]):
+                    pct = float(row[col_map['retention_pct']]) / 100
+                    ret_val = Decimal(str(round(invoice_value * pct, 2)))
+                else:
+                    ret_val = Decimal(str(round(invoice_value * 0.10, 2)))
                 
-                gst = row.get('GST')
-                if pd.isna(gst):
-                    # Standard practice: GST is calculated on Gross Value (before retention)
-                    gst = round(invoice_value * 0.18, 2)
+                # GST
+                gst_val = None
+                if 'gst_amt' in col_map and not pd.isna(row[col_map['gst_amt']]):
+                    gst_val = Decimal(str(row[col_map['gst_amt']]))
+                elif 'gst_pct' in col_map and not pd.isna(row[col_map['gst_pct']]):
+                    pct = float(row[col_map['gst_pct']]) / 100
+                    gst_val = Decimal(str(round((invoice_value - float(ret_val)) * pct, 2)))
+                else:
+                    gst_val = Decimal(str(round((invoice_value - float(ret_val)) * 0.18, 2)))
 
-                # IMPORTANT: bulk_create does NOT call save(), so we must calculate total manually
-                inv_val = Decimal(str(invoice_value or 0))
-                ret_val = Decimal(str(retention or 0))
-                gst_val = Decimal(str(gst or 0))
-                total_val = inv_val - ret_val + gst_val
+                total_val = Decimal(str(invoice_value)) - ret_val + gst_val
 
                 to_create.append(Invoice(
                     date=date_val,
                     invoice_no=invoice_no,
-                    client_number=str(row['Client Number']).strip() if not pd.isna(row['Client Number']) else '',
-                    project_name=str(row['Project Name']).strip() if not pd.isna(row['Project Name']) else '',
-                    work_order_no=str(row['Work Order No']).strip() if not pd.isna(row['Work Order No']) else '',
-                    pr_no=str(row['PR No']).strip() if not pd.isna(row['PR No']) else '',
+                    client_number=str(row[col_map['client_number']]).strip() if not pd.isna(row[col_map['client_number']]) else '',
+                    project_name=str(row[col_map['project_name']]).strip() if not pd.isna(row[col_map['project_name']]) else '',
+                    work_order_no=str(row[col_map['work_order_no']]).strip() if not pd.isna(row[col_map['work_order_no']]) else '',
+                    pr_no=str(row[col_map['pr_no']]).strip() if not pd.isna(row[col_map['pr_no']]) else '',
                     invoice_value=invoice_value,
-                    retention=retention,
-                    gst=gst,
+                    retention=ret_val,
+                    gst=gst_val,
                     total=total_val
                 ))
-                # Add to existing_nos to prevent duplicates within the same Excel sheet
                 existing_nos.add(invoice_no)
 
             if to_create:

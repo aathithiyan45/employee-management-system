@@ -107,9 +107,8 @@ function Payroll() {
           </div>
           <div className="header-right">
             <button 
-              className="action-btn"
+              className="action-btn btn-primary"
               onClick={() => navigate('/payroll-analytics')}
-              style={{ padding: "8px 16px", display: "flex", alignItems: "center", gap: "8px", background: "var(--blue-50)", color: "var(--blue-600)", border: "1px solid var(--blue-200)", borderRadius: "var(--radius-md)", fontWeight: "500", cursor: "pointer" }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20V10M18 20V4M6 20v-4" />
@@ -141,10 +140,10 @@ function Payroll() {
               <div className="form-group">
                 <label>&nbsp;</label>
                 <button 
-                  className={`btn-save ${generatedSuccess ? 'success-btn' : ''}`} 
+                  className={`action-btn btn-primary ${generatedSuccess ? 'btn-success disabled' : ''}`} 
                   onClick={handleGenerate} 
                   disabled={loading || !month || generatedSuccess}
-                  style={{ height: "38px", padding: "0 20px" }}
+                  style={{ minWidth: "180px" }}
                 >
                   {loading ? "Processing..." : generatedSuccess ? "✔ Payroll Generated" : "Generate Payroll"}
                 </button>
