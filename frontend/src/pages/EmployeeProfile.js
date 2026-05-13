@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
-import Toast from "../components/Toast";
+import Toast from "../components/Toast.js";
 import "./EmployeeProfile.css";
 
 function EmployeeProfile() {

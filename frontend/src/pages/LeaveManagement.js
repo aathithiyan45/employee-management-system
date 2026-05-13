@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
-import SearchableSelect from "../components/SearchableSelect";
+import SearchableSelect from "../components/SearchableSelect.js";
 import Sidebar from "../components/Sidebar";
 import "./LeaveManagement.css";
 

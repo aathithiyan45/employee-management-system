@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import api from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
-import SearchableSelect from "../components/SearchableSelect";
+import SearchableSelect from "../components/SearchableSelect.js";
 import "./WorkLog.css";
 
 function WorkLog() {
