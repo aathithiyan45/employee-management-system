@@ -85,10 +85,11 @@ def document_list_upload(request, emp_id):
         return Response({'error': err}, status=400)
 
     try:
-        # Ensure media directory exists for this specific path
-        # upload_to='employee_docs/%Y/%m/'
-        media_path = os.path.join(settings.MEDIA_ROOT, 'employee_docs', date.today().strftime('%Y/%m'))
-        os.makedirs(media_path, exist_ok=True)
+        # Ensure local media directory exists only if using local FileSystemStorage
+        from django.core.files.storage import default_storage, FileSystemStorage
+        if isinstance(default_storage, FileSystemStorage):
+            media_path = os.path.join(settings.MEDIA_ROOT, 'employee_docs', date.today().strftime('%Y/%m'))
+            os.makedirs(media_path, exist_ok=True)
 
         doc = EmployeeDocument.objects.create(
             employee    = emp,
@@ -155,13 +156,13 @@ def document_delete(request, pk):
             request=request
         )
 
-        # Remove physical file from disk
-        if doc.file and os.path.isfile(doc.file.path):
+        # Remove physical file from storage
+        if doc.file:
             try:
-                os.remove(doc.file.path)
+                doc.file.delete(save=False)
             except Exception as e:
                 # Log but continue deletion if file removal fails
-                print(f"Warning: Failed to delete physical file {doc.file.path}: {e}")
+                print(f"Warning: Failed to delete physical file: {e}")
 
         doc.delete()
         return Response({'message': 'Document deleted successfully and action logged.'})
@@ -185,7 +186,7 @@ def document_download(request, pk):
     if request.user.role not in ('admin', 'hr'):
         return Response({'error': 'Forbidden.'}, status=403)
 
-    if not os.path.isfile(doc.file.path):
+    if not doc.file or not doc.file.storage.exists(doc.file.name):
         return Response({'error': 'File not found on server.'}, status=404)
 
     file_name = os.path.basename(doc.file.name)
@@ -276,8 +277,8 @@ def document_preview(request, pk):
     if request.user.role not in ('admin', 'hr'):
         return Response({'error': 'Forbidden.'}, status=403)
 
-    if not os.path.isfile(doc.file.path):
-        return Response({'error': f'File not found on server disk. (Path: {doc.file.path})'}, status=404)
+    if not doc.file or not doc.file.storage.exists(doc.file.name):
+        return Response({'error': 'File not found on server.'}, status=404)
 
     try:
         # Explicitly guess content type to ensure browser renders correctly (e.g. application/pdf)
