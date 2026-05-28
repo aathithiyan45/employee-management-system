@@ -41,10 +41,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',  # required for BLACKLIST_AFTER_ROTATION
+    'rest_framework_simplejwt.token_blacklist',  
     'apps.employees',
     'apps.accounts',
-    'apps.leave',
     'apps.documents',
     'apps.analytics',
     'apps.payroll',
@@ -177,7 +176,38 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-if not DEBUG:
+# ─────────────────────────────────────────────
+# STORAGE CONFIGURATION (S3-compatible / Supabase)
+# ─────────────────────────────────────────────
+AWS_ACCESS_KEY_ID = config('AWS_ACCESS_KEY_ID', default=None)
+AWS_SECRET_ACCESS_KEY = config('AWS_SECRET_ACCESS_KEY', default=None)
+AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default=None)
+AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default=None)
+AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default=None)
+
+# S3 is active only if all required environment variables are configured
+USE_S3 = all([
+    AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY,
+    AWS_STORAGE_BUCKET_NAME,
+    AWS_S3_ENDPOINT_URL,
+    AWS_S3_REGION_NAME
+])
+
+if USE_S3:
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True  # Generate secure pre-signed URLs for leave attachments
+    
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+else:
     STORAGES = {
         "default": {
             "BACKEND": "django.core.files.storage.FileSystemStorage",
@@ -186,6 +216,7 @@ if not DEBUG:
             "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
         },
     }
+
 
 
 MEDIA_URL = '/media/'
@@ -216,7 +247,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'user': '1000/day',
-        'login': '10/minute',   # custom scope used on the login view
+        'login': '10/minute',   
     },
 }
 
@@ -228,7 +259,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=config('JWT_ACCESS_TOKEN_MINUTES', default=15, cast=int)),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=config('JWT_REFRESH_TOKEN_DAYS',  default=1,  cast=int)),
     'ROTATE_REFRESH_TOKENS':       True,
-    'BLACKLIST_AFTER_ROTATION':    True,   # old refresh tokens are invalidated after use
+    'BLACKLIST_AFTER_ROTATION':    True,   
     'UPDATE_LAST_LOGIN':           True,
     'ALGORITHM':                   'HS256',
     'AUTH_HEADER_TYPES':           ('Bearer',),

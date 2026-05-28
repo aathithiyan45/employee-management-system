@@ -4,6 +4,14 @@ import api from "../axiosInstance";
 import Toast from "../components/Toast.js";
 import "./EmployeeList.css";
 
+// ── Icon helper ───────────────────────────────────────────
+const Icon = ({ d, size = 16, stroke = "currentColor", fill = "none" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill}
+    stroke={stroke} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+
 function EmployeeList() {
   const navigate = useNavigate();
 
@@ -27,24 +35,40 @@ function EmployeeList() {
   // ── New filter states ──────────────────────────────────
   const [designation, setDesignation] = useState("");
   const [nationality, setNationality] = useState("");
-  const [docType, setDocType] = useState(urlParams.get("doc_type") || "");
+  const [docType, setDocType] = useState(urlParams.get("doc_type") || urlParams.get("expiry_alert") || "");
   const [expiryDays, setExpiryDays] = useState(urlParams.get("days") || "60");
-  const [tempDocType, setTempDocType] = useState(urlParams.get("doc_type") || "");
+  const [tempDocType, setTempDocType] = useState(urlParams.get("doc_type") || urlParams.get("expiry_alert") || "");
   const [tempExpiryDays, setTempExpiryDays] = useState(urlParams.get("days") || "60");
   const [joinedFrom, setJoinedFrom] = useState("");
   const [joinedTo, setJoinedTo] = useState("");
   const [incomplete, setIncomplete] = useState(urlParams.get("incomplete") || "");
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [alertCounts, setAlertCounts] = useState({
+    total_employees: 0,
+    active_employees: 0,
+    inactive_employees: 0,
+    incomplete_profiles: 0,
+    passport_expiring: 0,
+    wp_expiring: 0,
+    ssic_gt_expiring: 0,
+  });
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
   };
 
-  // Get user info from localStorage
+  // Get user info and alert counts on mount
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
     setUser(userData);
+
+    api.get("dashboard/?division=all")
+      .then((res) => {
+        setAlertCounts(res.data);
+      })
+      .catch((err) => console.error("Error loading alert counts:", err));
   }, []);
 
   // ── Parse URL parameters on mount ──────────────────────
@@ -52,7 +76,7 @@ function EmployeeList() {
     const urlParams = new URLSearchParams(window.location.search);
     const divisionParam = urlParams.get("division");
     const statusParam = urlParams.get("status");
-    const docTypeParam = urlParams.get("doc_type");
+    const docTypeParam = urlParams.get("doc_type") || urlParams.get("expiry_alert");
     const daysParam = urlParams.get("days");
     const incompleteParam = urlParams.get("incomplete");
 
@@ -120,20 +144,18 @@ function EmployeeList() {
   ]);
 
   // ── Handle Employee Deletion ───────────────────────────
-  const deleteEmployee = async (empId, empName) => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete employee ${empName} (${empId})? This action cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+  const deleteEmployee = (empId, empName) => {
+    setDeleteTarget({ id: empId, name: empName });
+  };
 
+  const confirmDeleteEmployee = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.delete(`employees/${empId}/`);
+      await api.delete(`employees/${deleteTarget.id}/`);
       // Refresh the employee list
       fetchEmployees();
       showToast("Employee deleted successfully");
+      setDeleteTarget(null);
     } catch (error) {
       console.error("Error deleting employee:", error);
       showToast("Failed to delete employee. Please try again.", "error");
@@ -309,6 +331,153 @@ function EmployeeList() {
         </div>
       </div>
 
+      {/* ── Priority Alerts Deck ────────────────────────── */}
+      <section className="employee-alerts-deck">
+        <div className="alerts-grid-employee">
+          
+          {/* Card 1: Total Employees */}
+          <div 
+            onClick={() => {
+              setStatus("");
+              setIncomplete("");
+              setDocType("");
+              setExpiryDays("60");
+              setCurrentPage(1);
+            }}
+            className={`alert-strip-card blue clickable ${!status && !incomplete && !docType ? "active-filter" : ""}`}
+          >
+            <div className="alert-icon-circle">
+              <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={16} stroke="#3b82f6" />
+            </div>
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">{alertCounts.total_employees || 0} Total Employees</div>
+              <div className="alert-strip-subtitle">All active & inactive</div>
+            </div>
+          </div>
+
+          {/* Card 2: Active Employees */}
+          <div 
+            onClick={() => {
+              setStatus("active");
+              setIncomplete("");
+              setDocType("");
+              setExpiryDays("60");
+              setCurrentPage(1);
+            }}
+            className={`alert-strip-card green clickable ${status === "active" && !incomplete && !docType ? "active-filter" : ""}`}
+          >
+            <div className="alert-icon-circle">
+              <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" size={16} stroke="#10b981" />
+            </div>
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">{alertCounts.active_employees || 0} Active Employees</div>
+              <div className="alert-strip-subtitle">Current workforce</div>
+            </div>
+          </div>
+
+          {/* Card 3: Inactive Employees */}
+          <div 
+            onClick={() => {
+              setStatus("inactive");
+              setIncomplete("");
+              setDocType("");
+              setExpiryDays("60");
+              setCurrentPage(1);
+            }}
+            className={`alert-strip-card red clickable ${status === "inactive" && !incomplete && !docType ? "active-filter" : ""}`}
+          >
+            <div className="alert-icon-circle">
+              <Icon d="M18.36 18.36A9 9 0 115.64 5.64m12.72 12.72A9 9 0 115.64 5.64" size={16} stroke="#ef4444" />
+            </div>
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">{alertCounts.inactive_employees || 0} Inactive Employees</div>
+              <div className="alert-strip-subtitle">Exited workforce</div>
+            </div>
+          </div>
+
+          {/* Card 4: Incomplete Profiles */}
+          <div 
+            onClick={() => {
+              setStatus("");
+              setIncomplete("true");
+              setDocType("");
+              setExpiryDays("");
+              setCurrentPage(1);
+            }}
+            className={`alert-strip-card danger clickable ${incomplete === "true" ? "active-filter" : ""}`}
+          >
+            <div className="alert-icon-circle">
+              <Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} stroke="#dc2626" />
+            </div>
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">{alertCounts.incomplete_profiles || 0} Incomplete Profiles</div>
+              <div className="alert-strip-subtitle">Action required</div>
+            </div>
+          </div>
+
+          {/* Card 5: Passport Expiring */}
+          <div 
+            onClick={() => {
+              setStatus("");
+              setIncomplete("");
+              setDocType("passport");
+              setExpiryDays("90");
+              setCurrentPage(1);
+            }}
+            className={`alert-strip-card warning clickable ${docType === "passport" && expiryDays === "90" ? "active-filter" : ""}`}
+          >
+            <div className="alert-icon-circle">
+              <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" size={16} stroke="#d97706" />
+            </div>
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">{alertCounts.passport_expiring || 0} Passports Expiring</div>
+              <div className="alert-strip-subtitle">Within 90 days</div>
+            </div>
+          </div>
+
+          {/* Card 6: Work Permit Expiring */}
+          <div 
+            onClick={() => {
+              setStatus("");
+              setIncomplete("");
+              setDocType("wp");
+              setExpiryDays("60");
+              setCurrentPage(1);
+            }}
+            className={`alert-strip-card info clickable ${docType === "wp" && expiryDays === "60" ? "active-filter" : ""}`}
+          >
+            <div className="alert-icon-circle">
+              <Icon d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" size={16} stroke="#2563eb" />
+            </div>
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">{alertCounts.wp_expiring || 0} Work Permits Expiring</div>
+              <div className="alert-strip-subtitle">Within 60 days</div>
+            </div>
+          </div>
+
+          {/* Card 7: SSIC / ID Expiring */}
+          <div 
+            onClick={() => {
+              setStatus("");
+              setIncomplete("");
+              setDocType("ssic_gt");
+              setExpiryDays("60");
+              setCurrentPage(1);
+            }}
+            className={`alert-strip-card purple clickable ${docType === "ssic_gt" && expiryDays === "60" ? "active-filter" : ""}`}
+          >
+            <div className="alert-icon-circle">
+              <Icon d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" size={16} stroke="#7c3aed" />
+            </div>
+            <div className="alert-strip-body">
+              <div className="alert-strip-title">{alertCounts.ssic_gt_expiring || 0} SSIC / ID Expiring</div>
+              <div className="alert-strip-subtitle">Within 60 days</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       {/* ── Stats ─────────────────────────────────────── */}
       <div className="stats-bar">
         <span className="stats-text">
@@ -454,6 +623,29 @@ function EmployeeList() {
           >
             Next ›
           </button>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="custom-confirm-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon">⚠️</div>
+            <h3>Delete Employee</h3>
+            <p>
+              Are you sure you want to delete employee <strong>{deleteTarget.name} ({deleteTarget.id})</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="confirm-modal-actions">
+              <button className="confirm-btn cancel" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </button>
+              <button className="confirm-btn confirm" onClick={() => {
+                confirmDeleteEmployee();
+              }}>
+                Delete Employee
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -716,3 +716,227 @@
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
+
+/* ── Employee Page Alert Cards Deck ── */
+.employee-alerts-deck {
+  margin-top: 8px;
+  margin-bottom: 24px;
+}
+
+.alerts-grid-employee {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+}
+
+.alert-strip-card {
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1.5px solid transparent;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.alert-strip-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* Active selection border styling */
+.alert-strip-card.active-filter {
+  border-width: 1.5px !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08), 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+}
+
+.alert-strip-card.blue.active-filter { border-color: #3b82f6 !important; }
+.alert-strip-card.green.active-filter { border-color: #10b981 !important; }
+.alert-strip-card.red.active-filter { border-color: #ef4444 !important; }
+.alert-strip-card.danger.active-filter { border-color: #dc2626 !important; }
+.alert-strip-card.warning.active-filter { border-color: #d97706 !important; }
+.alert-strip-card.info.active-filter { border-color: #2563eb !important; }
+.alert-strip-card.purple.active-filter { border-color: #7c3aed !important; }
+
+/* Blue Theme (Total Employees) */
+.alert-strip-card.blue {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, 0.15);
+}
+.alert-strip-card.blue:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.alert-strip-card.blue .alert-icon-circle {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+.alert-strip-card.blue .alert-strip-title {
+  color: #1d4ed8;
+}
+
+/* Green Theme (Active Employees) */
+.alert-strip-card.green {
+  background: #f0fdf4;
+  border-color: rgba(16, 185, 129, 0.15);
+}
+.alert-strip-card.green:hover {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.alert-strip-card.green .alert-icon-circle {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+.alert-strip-card.green .alert-strip-title {
+  color: #047857;
+}
+
+/* Red Theme (Inactive Employees) */
+.alert-strip-card.red {
+  background: #fef2f2;
+  border-color: rgba(239, 68, 68, 0.15);
+}
+.alert-strip-card.red:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.alert-strip-card.red .alert-icon-circle {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+.alert-strip-card.red .alert-strip-title {
+  color: #b91c1c;
+}
+
+/* Danger / Red Theme */
+.alert-strip-card.danger {
+  background: #fef2f2;
+  border-color: rgba(239, 68, 68, 0.15);
+}
+.alert-strip-card.danger:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.alert-strip-card.danger .alert-icon-circle {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+}
+.alert-strip-card.danger .alert-strip-title {
+  color: #b91c1c;
+}
+
+/* Warning / Orange Theme */
+.alert-strip-card.warning {
+  background: #fffbeb;
+  border-color: rgba(245, 158, 11, 0.15);
+}
+.alert-strip-card.warning:hover {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.alert-strip-card.warning .alert-icon-circle {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+}
+.alert-strip-card.warning .alert-strip-title {
+  color: #b45309;
+}
+
+/* Info / Blue Theme */
+.alert-strip-card.info {
+  background: #eff6ff;
+  border-color: rgba(59, 130, 246, 0.15);
+}
+.alert-strip-card.info:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.alert-strip-card.info .alert-icon-circle {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+}
+.alert-strip-card.info .alert-strip-title {
+  color: #1d4ed8;
+}
+
+/* Purple Theme */
+.alert-strip-card.purple {
+  background: #faf5ff;
+  border-color: rgba(139, 92, 246, 0.15);
+}
+.alert-strip-card.purple:hover {
+  border-color: rgba(139, 92, 246, 0.3);
+}
+.alert-strip-card.purple .alert-icon-circle {
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+}
+.alert-strip-card.purple .alert-strip-title {
+  color: #6d28d9;
+}
+
+/* View All Alerts / Indigo Outline Theme */
+.alert-strip-card.view-all {
+  background: #ffffff;
+  border: 1.5px solid #4f46e5;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+.alert-strip-card.view-all:hover {
+  background: #f5f3ff;
+  border-color: #3730a3;
+}
+.alert-strip-card.view-all .view-all-text {
+  color: #4f46e5;
+  font-weight: 700;
+  font-size: 13px;
+}
+.alert-strip-card.view-all .view-all-arrow {
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+}
+
+.alert-icon-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.alert-strip-body {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.alert-strip-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-strip-subtitle {
+  font-size: 10.5px;
+  color: #64748b;
+  font-weight: 550;
+}
+
+@media (max-width: 1200px) {
+  .alerts-grid-employee {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .alerts-grid-employee {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

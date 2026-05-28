@@ -8,6 +8,7 @@ function Invoices() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -153,15 +154,21 @@ function Invoices() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this invoice?")) return;
-    
+  const handleDelete = (id, invoiceNo) => {
+    setDeleteTarget({ id, invoiceNo });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { id } = deleteTarget;
     try {
       await axiosInstance.delete(`invoices/${id}/`);
       setSuccess("Invoice deleted.");
       fetchInvoices();
     } catch (err) {
       setError("Failed to delete invoice");
+    } finally {
+      setDeleteTarget(null);
     }
   };
 
@@ -429,7 +436,7 @@ function Invoices() {
                           </button>
                           <button 
                             className="action-btn btn-row-delete" 
-                            onClick={() => handleDelete(inv.id)}
+                            onClick={() => handleDelete(inv.id, inv.invoice_no)}
                           >
                             Delete
                           </button>
@@ -481,6 +488,27 @@ function Invoices() {
           </div>
         </section>
       </main>
+
+      {deleteTarget && (
+        <div className="custom-confirm-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon">⚠️</div>
+            <h3>Delete Invoice</h3>
+            <p>
+              Are you sure you want to delete invoice <strong>{deleteTarget.invoiceNo}</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="confirm-modal-actions">
+              <button className="confirm-btn cancel" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </button>
+              <button className="confirm-btn confirm" onClick={confirmDelete}>
+                Delete Invoice
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -21,7 +21,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .models import (
     Employee, Division, User,
 )
-from apps.leave.models import LeaveBalance, LeaveRequest
 
 import secrets
 import string
@@ -375,7 +374,9 @@ def import_status(request, job_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminOrHR])
 def get_divisions(request):
-    divisions = Division.objects.filter(is_active=True).values("id", "name")
+    divisions = Division.objects.filter(is_active=True).annotate(
+        emp_count=Count('employees')
+    ).values("id", "name", "emp_count")
     return Response(list(divisions))
 
 

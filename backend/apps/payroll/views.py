@@ -256,13 +256,13 @@ class PayrollAnalyticsView(views.APIView):
 
         # ── 3. Scalar aggregates ─────────────────────────────────────────────
         agg = payrolls.aggregate(
-            total_salary=Sum("total_salary"),
-            total_hours=Sum("total_hours"),
+            sum_salary=Sum("total_salary"),
+            sum_hours=Sum("total_hours"),
             avg_salary=Avg("total_salary"),
         )
 
-        total_salary  = float(agg["total_salary"] or 0.0)
-        total_hours   = float(agg["total_hours"]  or 0.0)
+        total_salary  = float(agg["sum_salary"] or 0.0)
+        total_hours   = float(agg["sum_hours"]  or 0.0)
         avg_salary    = float(agg["avg_salary"]   or 0.0)
 
         # ── 4. Status & worklog counts ───────────────────────────────────────
