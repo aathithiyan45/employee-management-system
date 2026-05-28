@@ -14,7 +14,7 @@ const ROLES = [
   { id: "hr",       label: "HR",       subtitle: "HR portal" },
 ];
 
-// Where each role lands after login
+
 const ROLE_HOME = {
   admin:    "/dashboard",
   hr:       "/hr/dashboard",
