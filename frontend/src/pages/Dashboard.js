@@ -140,6 +140,7 @@ function Dashboard() {
   );
   const [divisions, setDivisions] = useState([]);
   const [loading, setLoading] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [exportLoading, setExportLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -335,6 +336,7 @@ function Dashboard() {
   };
 
   // ── Quick upload / import ────────────────────────────────
+  // eslint-disable-next-line no-unused-vars
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -366,6 +368,7 @@ function Dashboard() {
   };
 
   // ── Export CSV ───────────────────────────────────────────
+  // eslint-disable-next-line no-unused-vars
   const handleExport = async () => {
     setExportLoading(true);
     try {

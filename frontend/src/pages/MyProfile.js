@@ -148,9 +148,32 @@ function MyProfile() {
                 <span className="profile-dot" />
               </div>
               <div className="profile-topbar-user-info">
-                <span className="profile-topbar-name">Admin</span>
-                <span className="profile-topbar-role">Super Admin</span>
+                <span className="profile-topbar-name">{user?.username || "Admin"}</span>
+                <span className="profile-topbar-role">{displayRole}</span>
               </div>
+
+              {profileDropdownOpen && (
+                <div className="profile-dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                  <div className="profile-dropdown-user-info">
+                    <strong>{user?.username || "Admin"}</strong>
+                    <span>{displayRole}</span>
+                  </div>
+                  <hr className="profile-dropdown-divider" />
+                  <button className="profile-dropdown-item" onClick={() => { navigate("/profile"); setProfileDropdownOpen(false); }}>
+                    <Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" size={14} /> My Profile
+                  </button>
+                  <button className="profile-dropdown-item" onClick={() => { navigate("/profile"); setProfileDropdownOpen(false); }}>
+                    <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" size={14} /> Account Settings
+                  </button>
+                  <button className="profile-dropdown-item" onClick={() => { navigate("/change-password"); setProfileDropdownOpen(false); }}>
+                    <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" size={14} /> Change Password
+                  </button>
+                  <hr className="profile-dropdown-divider" />
+                  <button className="profile-dropdown-item logout" onClick={handleLogout}>
+                    <Icon d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" size={14} /> Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
@@ -163,14 +186,14 @@ function MyProfile() {
             <div className="profile-header-left">
               <div className="profile-avatar-container">
                 <div className="profile-avatar-large">
-                  AD
+                  {getInitials(user?.username || "Admin")}
                 </div>
                 <span className="profile-avatar-status-dot" />
               </div>
               <div className="profile-header-info">
                 <div className="profile-name-row">
-                  <h2>Admin</h2>
-                  <span className="profile-badge-role">Super Admin</span>
+                  <h2>{user?.username || "Admin"}</h2>
+                  <span className="profile-badge-role">{displayRole}</span>
                 </div>
                 <div className="profile-header-contact-new">
                   <span className="profile-header-company">Workforce Management System</span>
