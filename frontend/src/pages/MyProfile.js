@@ -59,6 +59,7 @@ function MyProfile() {
     return () => document.removeEventListener("click", handleOutsideClick);
   }, [alertsOpen, profileDropdownOpen]);
 
+  // eslint-disable-next-line no-unused-vars
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -73,6 +74,7 @@ function MyProfile() {
     return (name || "?").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
   };
 
+  // eslint-disable-next-line no-unused-vars
   const displayRole = user.role === "admin" ? "Super Admin" : user.role === "hr" ? "HR Specialist" : "Employee";
 
   const alertsList = [
