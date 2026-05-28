@@ -14,6 +14,7 @@ function EmployeeProfile() {
   const [formData, setFormData] = useState({});
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -72,15 +73,11 @@ function EmployeeProfile() {
   };
 
   // ── Handle Employee Deletion ───────────────────────────
-  const deleteEmployee = async () => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete employee ${emp?.name} (${emp?.emp_id})? This action cannot be undone.`,
-      )
-    ) {
-      return;
-    }
+  const deleteEmployee = () => {
+    setShowDeleteModal(true);
+  };
 
+  const confirmDeleteEmployee = async () => {
     try {
       await api.delete(`employees/${empId}/`);
       showToast("Employee deleted successfully");
@@ -490,6 +487,30 @@ function EmployeeProfile() {
           </Section>
         )}
       </div>
+
+      {showDeleteModal && (
+        <div className="custom-confirm-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon">⚠️</div>
+            <h3>Delete Employee</h3>
+            <p>
+              Are you sure you want to delete employee <strong>{emp?.name} ({emp?.emp_id})</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="confirm-modal-actions">
+              <button className="confirm-btn cancel" onClick={() => setShowDeleteModal(false)}>
+                Cancel
+              </button>
+              <button className="confirm-btn confirm" onClick={() => {
+                setShowDeleteModal(false);
+                confirmDeleteEmployee();
+              }}>
+                Delete Employee
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <Toast

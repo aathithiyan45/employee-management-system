@@ -3,13 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 // Pages
 import Login          from "./pages/Login";
 import Dashboard      from "./pages/Dashboard";
-import HRDashboard    from "./pages/HRDashboard";
 import EmployeeList   from "./pages/EmployeeList";
 import EmployeeDetail from "./pages/EmployeeDetail";
 import EmployeeProfile from "./pages/EmployeeProfile";
 import ImportEmployees from "./pages/Importemployees";
-import LeaveManagement from "./pages/LeaveManagement";
-import LeaveBalance   from "./pages/LeaveBalance";
 import ChangePassword from "./pages/ChangePassword";
 import SetPassword    from "./pages/SetPassword";
 import AuditLogs      from "./pages/AuditLogs";
@@ -19,8 +16,8 @@ import Payroll       from "./pages/Payroll";
 import PayrollAnalytics from "./pages/PayrollAnalytics";
 import Invoices      from "./pages/Invoices";
 import EmployeeAnalytics from "./pages/EmployeeAnalytics";
-import LeaveAnalytics    from "./pages/LeaveAnalytics";
 import PrivateRoute   from "./components/PrivateRoute";
+import MyProfile      from "./pages/MyProfile";
 
 import "./App.css";
 
@@ -55,12 +52,6 @@ function App() {
 
         {/* ── Admin + HR shared routes ─────────────────────
             PrivateRoute allows hr role on "admin" routes    */}
-        <Route path="/leave" element={
-          <PrivateRoute requiredRole="admin"><LeaveManagement /></PrivateRoute>
-        } />
-        <Route path="/leave/balance/:empId" element={
-          <PrivateRoute requiredRole="admin"><LeaveBalance /></PrivateRoute>
-        } />
         <Route path="/worklog" element={
           <PrivateRoute requiredRole="admin"><WorkLog /></PrivateRoute>
         } />
@@ -73,16 +64,8 @@ function App() {
         <Route path="/employee-analytics" element={
           <PrivateRoute requiredRole="admin"><EmployeeAnalytics /></PrivateRoute>
         } />
-        <Route path="/leave-analytics" element={
-          <PrivateRoute requiredRole="admin"><LeaveAnalytics /></PrivateRoute>
-        } />
         <Route path="/invoices" element={
           <PrivateRoute requiredRole="admin"><Invoices /></PrivateRoute>
-        } />
-
-        {/* ── HR only ─────────────────────────────────────── */}
-        <Route path="/hr/dashboard" element={
-          <PrivateRoute requiredRole="hr"><HRDashboard /></PrivateRoute>
         } />
 
         {/* ── Authenticated — any role ─────────────────────── */}
@@ -91,6 +74,9 @@ function App() {
         } />
         <Route path="/documents" element={
           <PrivateRoute requiredRole="any"><Documents /></PrivateRoute>
+        } />
+        <Route path="/profile" element={
+          <PrivateRoute requiredRole="any"><MyProfile /></PrivateRoute>
         } />
 
         {/* ── 404 catch-all — must be last ────────────────── */}

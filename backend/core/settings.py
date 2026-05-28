@@ -41,10 +41,9 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',  # required for BLACKLIST_AFTER_ROTATION
+    'rest_framework_simplejwt.token_blacklist',  
     'apps.employees',
     'apps.accounts',
-    'apps.leave',
     'apps.documents',
     'apps.analytics',
     'apps.payroll',
@@ -248,7 +247,7 @@ REST_FRAMEWORK = {
     'DEFAULT_THROTTLE_RATES': {
         'anon': '100/day',
         'user': '1000/day',
-        'login': '10/minute',   # custom scope used on the login view
+        'login': '10/minute',   
     },
 }
 
@@ -260,7 +259,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=config('JWT_ACCESS_TOKEN_MINUTES', default=15, cast=int)),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=config('JWT_REFRESH_TOKEN_DAYS',  default=1,  cast=int)),
     'ROTATE_REFRESH_TOKENS':       True,
-    'BLACKLIST_AFTER_ROTATION':    True,   # old refresh tokens are invalidated after use
+    'BLACKLIST_AFTER_ROTATION':    True,   
     'UPDATE_LAST_LOGIN':           True,
     'ALGORITHM':                   'HS256',
     'AUTH_HEADER_TYPES':           ('Bearer',),

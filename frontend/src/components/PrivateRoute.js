@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 // Where each role goes after login — used for wrong-role redirects
 const ROLE_HOME = {
   admin:    "/dashboard",
-  hr:       "/hr/dashboard",
+  hr:       "/dashboard",
 };
 
 /**

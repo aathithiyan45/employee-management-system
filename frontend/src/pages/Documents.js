@@ -350,7 +350,10 @@ export default function Documents() {
   const isPriv  = user.role === 'admin' || user.role === 'hr';
   const ownId   = user.emp_id || null;
 
-  const [empId,      setEmpId]      = useState(ownId || '');
+  const queryParams = new URLSearchParams(window.location.search);
+  const paramEmpId = queryParams.get('empId') || queryParams.get('emp_id');
+
+  const [empId,      setEmpId]      = useState(paramEmpId || ownId || '');
   const [empName,    setEmpName]    = useState('');
   const [docs,       setDocs]       = useState([]);
   const [expiring,   setExpiring]   = useState([]);
@@ -359,12 +362,28 @@ export default function Documents() {
   const [showUpload, setShowUpload] = useState(false);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [deleting,   setDeleting]   = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [tab,        setTab]        = useState('docs');
   const [toast,      setToast]      = useState(null);
   const [typeFilter, setTypeFilter] = useState('all');
 
-  // Auto-load employee's own docs
-  useEffect(() => { if (ownId) loadDocs(ownId); }, [ownId]);
+  // Auto-load employee's own docs or URL param docs
+  useEffect(() => {
+    const qp = new URLSearchParams(window.location.search);
+    const pid = qp.get('empId') || qp.get('emp_id');
+    const idToLoad = pid || ownId;
+    if (idToLoad) {
+      setEmpId(idToLoad);
+      loadDocs(idToLoad);
+      if (pid) {
+        api.get(`/employees/${pid}/`)
+          .then(res => setEmpName(res.data.name))
+          .catch(() => {});
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [window.location.search, ownId]);
+
   useEffect(() => { if (isPriv) loadExpiring(); }, [isPriv]);
 
   const showToast = (msg, type = 'success') => {
@@ -398,9 +417,15 @@ export default function Documents() {
     loadDocs(id);
   };
 
-  const handleDelete = async (pk) => {
-    if (!window.confirm('Delete this document permanently?')) return;
+  const handleDelete = (pk, label) => {
+    setDeleteTarget({ pk, label });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const { pk } = deleteTarget;
     setDeleting(pk);
+    setDeleteTarget(null);
     try {
       await api.delete(`/documents/${pk}/delete/`);
       setDocs(prev => prev.filter(d => d.id !== pk));
@@ -621,7 +646,7 @@ export default function Documents() {
                                     </button>
                                     {isPriv && (
                                       <button className="doc-action-btn doc-action-btn--delete"
-                                        onClick={() => handleDelete(doc.id)}
+                                        onClick={() => handleDelete(doc.id, doc.label)}
                                         disabled={deleting === doc.id} title="Delete">
                                         <Icon d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" size={14} />
                                         {deleting === doc.id ? '…' : 'Delete'}
@@ -673,6 +698,27 @@ export default function Documents() {
       {/* Preview modal */}
       {previewDoc && (
         <PreviewModal doc={previewDoc} onClose={() => setPreviewDoc(null)} />
+      )}
+
+      {deleteTarget && (
+        <div className="custom-confirm-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-modal-icon">⚠️</div>
+            <h3>Delete Document</h3>
+            <p>
+              Are you sure you want to delete document <strong>{deleteTarget.label}</strong> permanently?
+              This action cannot be undone.
+            </p>
+            <div className="confirm-modal-actions">
+              <button className="confirm-btn cancel" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </button>
+              <button className="confirm-btn confirm" onClick={confirmDelete}>
+                Delete Document
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
