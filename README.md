@@ -2,7 +2,7 @@
 
 A full-stack Employee Management System built for internal HR and admin operations. This platform helps organizations manage employees, payroll, leave requests, documents, invoices, and analytics securely through a modern web interface.
 
-## 🚀 Features
+## Features
 
 ### Authentication & Security
 - JWT-based authentication
