@@ -20,11 +20,6 @@ A full-stack Employee Management System built for internal HR and admin operatio
 - Employee status management
 - Employee profile details & records
 
-### Leave Management
-- Apply leave requests
-- Leave approval / rejection by HR/Admin
-- Leave balance tracking
-- Medical certificate / attachment upload support
 
 ### Payroll Management
 - Salary structure management
