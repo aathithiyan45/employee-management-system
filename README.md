@@ -1,4 +1,4 @@
-# Employee Management System 🏢
+# Employee Management System 
 
 A full-stack Employee Management System built for internal HR and admin operations. This platform helps organizations manage employees, payroll, leave requests, documents, invoices, and analytics securely through a modern web interface.
 
@@ -53,7 +53,7 @@ A full-stack Employee Management System built for internal HR and admin operatio
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### Frontend
 - React.js
