@@ -386,10 +386,12 @@
 
 .divisions-horizontal-scroll {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(6, minmax(160px, 1fr));
   gap: 16px;
   overflow-x: auto;
   padding: 6px 4px 8px 4px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .division-deck-card {
@@ -450,10 +452,10 @@
   color: #1e293b;
 }
 
-/* ── 4. KPI METRIC CARDS ──────────────────────────────────── */
+
 .metrics-grid-section {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
   margin-bottom: 32px;
 }
@@ -552,7 +554,7 @@
 
 .alerts-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -705,7 +707,7 @@
 /* ── 6. OPERATIONS TABLES ─────────────────────────────────── */
 .tables-double-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   margin-bottom: 32px;
 }
@@ -897,7 +899,7 @@
 
 .charts-premium-grid {
   display: grid;
-  grid-template-columns: repeat(12, 1fr);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 24px;
 }
 
@@ -1066,16 +1068,15 @@
 /* ── 8. RESPONSIVENESS ────────────────────────────────────── */
 @media (max-width: 1400px) {
   .divisions-horizontal-scroll {
-    grid-template-columns: repeat(3, 1fr);
-    overflow-x: auto;
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
   }
   
   .metrics-grid-section {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .alerts-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -1097,15 +1098,15 @@
   }
 
   .divisions-horizontal-scroll {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
   }
 
   .metrics-grid-section {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .alerts-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
   }
 
@@ -1124,11 +1125,11 @@
 
 @media (max-width: 640px) {
   .divisions-horizontal-scroll {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 
   .metrics-grid-section {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
     gap: 12px;
   }
   
@@ -1138,7 +1139,7 @@
   }
   
   .alerts-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
     gap: 12px;
   }
 }

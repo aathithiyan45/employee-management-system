@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
 import Toast from "../components/Toast.js";
+import Sidebar from "../components/Sidebar";
 import "./EmployeeList.css";
 
 // ── Icon helper ───────────────────────────────────────────
@@ -208,7 +209,9 @@ function EmployeeList() {
   const totalPages = Math.ceil(totalEmployees / pageSize);
 
   return (
-    <div className="employee-page">
+    <div className="dashboard-container">
+      <Sidebar />
+      <main className="dashboard-main employee-page">
       {/* ── HEADER ────────────────────────────────────── */}
       <div className="employee-header">
         <div className="header-left">
@@ -656,6 +659,7 @@ function EmployeeList() {
           onClose={() => setToast(null)}
         />
       )}
+      </main>
     </div>
   );
 }

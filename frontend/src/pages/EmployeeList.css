@@ -725,7 +725,7 @@
 
 .alerts-grid-employee {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -930,7 +930,7 @@
 
 @media (max-width: 1200px) {
   .alerts-grid-employee {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

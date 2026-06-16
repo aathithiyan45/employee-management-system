@@ -2,32 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "../axiosInstance";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
-import {
-  Chart as ChartJS,
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title,
-} from "chart.js";
-import { Doughnut, Line, Bar } from "react-chartjs-2";
 import "./Dashboard.css";
-
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Title
-);
 
 // ── Icon helper ───────────────────────────────────────────
 const Icon = ({ d, size = 16, stroke = "currentColor", fill = "none" }) => (
@@ -89,36 +64,7 @@ const toTitleCase = (str) => {
   return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
-const getDivisionLabel = (divKey) => {
-  const mapping = {
-    "PDS MARINE": "PDS Marine",
-    "PDS OFFSHORE": "PDS Offshore",
-    "PDS ENGG": "PDS Engineering",
-    "GSI MARINE": "GSI Marine",
-    "GSI ENGG": "GSI Engineering"
-  };
-  return mapping[divKey] || divKey;
-};
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return "May 28, 2026";
-  const options = { month: 'short', day: 'numeric', year: 'numeric' };
-  return new Date(dateStr).toLocaleDateString('en-US', options);
-};
-
-const getAvatarStyle = (name) => {
-  const colors = [
-    { bg: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", text: "#ffffff" },
-    { bg: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)", text: "#ffffff" },
-    { bg: "linear-gradient(135deg, #10b981 0%, #047857 100%)", text: "#ffffff" },
-    { bg: "linear-gradient(135deg, #f59e0b 0%, #b45309 100%)", text: "#ffffff" },
-    { bg: "linear-gradient(135deg, #ec4899 0%, #be185d 100%)", text: "#ffffff" },
-    { bg: "linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)", text: "#ffffff" },
-    { bg: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)", text: "#ffffff" }
-  ];
-  const charCodeSum = (name || "?").split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return colors[charCodeSum % colors.length];
-};
 
 function Dashboard() {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
@@ -144,14 +90,6 @@ function Dashboard() {
   const [exportLoading, setExportLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const [divisionChartData, setDivisionChartData] = useState(null);
-  const [monthlyGrowthData, setMonthlyGrowthData] = useState(null);
-  const [designationChartData, setDesignationChartData] = useState(null);
-
-  // New states for Operations tables and Payroll card
-  const [recentEmployees, setRecentEmployees] = useState([]);
-  const [recentActivities, setRecentActivities] = useState([]);
-  const [payrollSummary, setPayrollSummary] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -194,52 +132,11 @@ function Dashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const fetchCharts = useCallback((div) => {
-    api.get(`charts/division-distribution/?division=${div}`)
-      .then((res) => setDivisionChartData(res.data))
-      .catch((err) => console.error("Division chart error:", err));
-
-    api.get(`charts/monthly-growth/?division=${div}`)
-      .then((res) => setMonthlyGrowthData(res.data))
-      .catch((err) => console.error("Monthly growth error:", err));
-
-    api.get(`charts/designation-breakdown/?division=${div}`)
-      .then((res) => setDesignationChartData(res.data))
-      .catch((err) => console.error("Designation chart error:", err));
-  }, []);
-
-  const fetchRecentEmployees = useCallback((div) => {
-    const params = div && div !== "all" ? `?division=${div}&page_size=5` : "?page_size=5";
-    api.get(`employees/${params}`)
-      .then(res => setRecentEmployees(res.data.results || []))
-      .catch(err => console.error("Recent employees fetch error:", err));
-  }, []);
-
-  const fetchRecentActivities = useCallback((div) => {
-    api.get("audit-logs/")
-      .then(res => {
-        const logs = res.data || [];
-        setRecentActivities(logs.slice(0, 5));
-      })
-      .catch(err => console.error("Recent activities fetch error:", err));
-  }, []);
-
-  const fetchPayrollSummary = useCallback(() => {
-    const currentMonthStr = new Date().toISOString().slice(0, 7);
-    api.get(`payroll-summary/?month=${currentMonthStr}`)
-      .then(res => setPayrollSummary(res.data))
-      .catch(err => console.error("Payroll summary fetch error:", err));
-  }, []);
-
   // ── Trigger Fetches ───────────────────────────────────────
   useEffect(() => {
     if (!division) return;
     fetchDashboard(division);
-    fetchCharts(division);
-    fetchRecentEmployees(division);
-    fetchRecentActivities(division);
-    fetchPayrollSummary();
-  }, [division, fetchDashboard, fetchCharts, fetchRecentEmployees, fetchRecentActivities, fetchPayrollSummary]);
+  }, [division, fetchDashboard]);
 
   // Click-outside listener for Alerts Center and Profile Dropdown
   useEffect(() => {
@@ -358,7 +255,6 @@ function Dashboard() {
       });
       showToast(`Import job submitted successfully. ID: ${res.data.job_id}`, "success");
       fetchDashboard(division);
-      fetchCharts(division);
     } catch (err) {
       showToast(err.response?.data?.error || "Import failed", "error");
     } finally {
@@ -449,54 +345,9 @@ function Dashboard() {
     { key: "GSI ENGG",      label: "GSI Engineering",  color: "#ef4444", bgClass: "gsi-eng" },
   ];
 
-  // Modern Chart.js Configs
-  const donutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: "75%",
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        backgroundColor: "#0f172a",
-        titleFont: { family: "DM Sans", size: 12 },
-        bodyFont: { family: "DM Sans", size: 12 },
-        padding: 10,
-        cornerRadius: 8,
-      }
-    },
-  };
-
-  const lineOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, ticks: { font: { family: "DM Sans", size: 10 }, color: "#64748b" } },
-      y: { border: { dash: [4, 4] }, grid: { color: "#f1f5f9" }, ticks: { font: { family: "DM Sans", size: 10 }, color: "#64748b" } }
-    }
-  };
-
-  const barOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    indexAxis: "y",
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { color: "#f1f5f9" }, ticks: { font: { family: "DM Sans", size: 10 }, color: "#64748b" } },
-      y: { grid: { display: false }, ticks: { font: { family: "DM Sans", size: 10 }, color: "#64748b" } }
-    }
-  };
-
   // Helper for profile letters
   const getInitials = (name) => {
     return (name || "?").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
-  };
-
-  const getDonutTotal = () => {
-    if (!divisionChartData || !divisionChartData.datasets || !divisionChartData.datasets[0]) return 0;
-    return divisionChartData.datasets[0].data.reduce((sum, val) => sum + val, 0);
   };
 
   return (
@@ -674,13 +525,6 @@ function Dashboard() {
                     <strong>{toTitleCase(user?.username || "Aathithiyan Sir")}</strong>
                     <span>{user?.role === "admin" ? "Super Admin" : "HR Specialist"}</span>
                   </div>
-                  <hr className="profile-dropdown-divider" />
-                  <button className="profile-dropdown-item" onClick={() => { navigate("/profile"); setProfileDropdownOpen(false); }}>
-                    <Icon d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" size={14} /> My Profile
-                  </button>
-                  <button className="profile-dropdown-item" onClick={() => { navigate("/profile"); setProfileDropdownOpen(false); }}>
-                    <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" size={14} /> Account Settings
-                  </button>
                   <button className="profile-dropdown-item" onClick={() => { navigate("/change-password"); setProfileDropdownOpen(false); }}>
                     <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" size={14} /> Change Password
                   </button>
@@ -909,229 +753,7 @@ function Dashboard() {
             </div>
           </section>
 
-          {/* ── 6. OPERATIONS TABLE SECTION ──────────────────────────── */}
-          <section className="tables-double-grid">
-            
-            {/* LEFT CARD: Recently Added Employees */}
-            <div className="premium-table-card">
-              <div className="table-card-header">
-                <h4>Recently Added Employees</h4>
-                <button className="section-text-link" onClick={() => navigate("/employees")}>View all</button>
-              </div>
-              <div className="dashboard-table-wrapper">
-                {loading ? (
-                  <SkeletonLoader type="table" />
-                ) : recentEmployees.length === 0 ? (
-                  <div className="table-empty-state">No recently added employees found.</div>
-                ) : (
-                  <table className="premium-min-table">
-                    <thead>
-                      <tr>
-                        <th>Employee</th>
-                        <th>Division</th>
-                        <th>Designation</th>
-                        <th>Added By</th>
-                        <th>Date</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentEmployees.map((emp) => {
-                        const avatarStyle = getAvatarStyle(emp.name);
-                        return (
-                          <tr key={emp.emp_id}>
-                            <td>
-                              <div className="emp-cell">
-                                <div className="emp-initials" style={{ background: avatarStyle.bg, color: avatarStyle.text }}>
-                                  {getInitials(emp.name)}
-                                </div>
-                                <span className="emp-name-text">{toTitleCase(emp.name)}</span>
-                              </div>
-                            </td>
-                            <td>{getDivisionLabel(emp.division)}</td>
-                            <td>{toTitleCase(emp.designation) || "—"}</td>
-                            <td>Admin</td>
-                            <td>{formatDate(emp.date_joined)}</td>
-                            <td className="text-center">
-                              <button className="row-action-dots-btn" onClick={(e) => { e.stopPropagation(); navigate(`/employees/${emp.emp_id}`); }}>
-                                <Icon d="M12 5v.01M12 12v.01M12 19v.01" size={16} stroke="#64748b" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
 
-            {/* RIGHT CARD: Recent System Activities */}
-            <div className="premium-table-card">
-              <div className="table-card-header">
-                <h4>Recent System Activities</h4>
-                <button className="section-text-link" onClick={() => navigate("/audit-logs")}>View all</button>
-              </div>
-              <div className="dashboard-table-wrapper">
-                {loading ? (
-                  <SkeletonLoader type="table" />
-                ) : recentActivities.length === 0 ? (
-                  <div className="table-empty-state">No recent activities recorded.</div>
-                ) : (
-                  <table className="premium-min-table">
-                    <thead>
-                      <tr>
-                        <th>Activity</th>
-                        <th>User</th>
-                        <th>IP Address</th>
-                        <th>Date & Time</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentActivities.map((act) => {
-                        const avatarStyle = getAvatarStyle(act.user_display || "System");
-                        return (
-                          <tr key={act.id}>
-                            <td>
-                              <span className={`badge-activity ${act.action?.toLowerCase()}`}>
-                                {toTitleCase(act.action?.replace(/_/g, " ")) || "Activity"}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="emp-cell">
-                                <div className="emp-initials" style={{ background: avatarStyle.bg, color: avatarStyle.text }}>
-                                  {getInitials(act.user_display || "System")}
-                                </div>
-                                <span className="emp-name-text">{toTitleCase(act.user_display || "System")}</span>
-                              </div>
-                            </td>
-                            <td><code>{act.ip_address || "—"}</code></td>
-                            <td>{act.timestamp ? new Date(act.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : "—"}</td>
-                            <td className="text-center">
-                              <button className="row-action-dots-btn" onClick={(e) => { e.stopPropagation(); navigate("/audit-logs"); }}>
-                                <Icon d="M12 5v.01M12 12v.01M12 19v.01" size={16} stroke="#64748b" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-
-          </section>
-
-          {/* ── 7. ANALYTICS SECTION ─────────────────────────────────── */}
-          <section className="charts-premium-section">
-            <div className="section-head">
-              <h3>Analytics Overview</h3>
-            </div>
-            
-            <div className="charts-premium-grid">
-              
-              {/* Doughnut Chart: Division Distribution */}
-              <div className="chart-premium-card card-span-6">
-                <h4>Division Distribution</h4>
-                <div className="donut-flex-container">
-                  <div className="chart-canvas-wrap donut-wrap-left">
-                    {divisionChartData ? (
-                      <>
-                        <Doughnut data={divisionChartData} options={donutOptions} />
-                        <div className="donut-center-text">
-                          <span className="donut-center-number">{getDonutTotal()}</span>
-                          <span className="donut-center-label">Total</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="chart-loading">Loading chart…</div>
-                    )}
-                  </div>
-                  {divisionChartData && (
-                    <div className="donut-custom-legend">
-                      {divisionChartData.labels.map((lbl, idx) => {
-                        const count = divisionChartData.datasets[0].data[idx];
-                        const total = getDonutTotal();
-                        const pct = total > 0 ? ((count / total) * 100).toFixed(1) : "0.0";
-                        const color = divisionChartData.datasets[0].backgroundColor[idx];
-                        return (
-                          <div key={lbl} className="donut-legend-item">
-                            <span className="donut-legend-color" style={{ background: color }} />
-                            <span className="donut-legend-label">{toTitleCase(lbl)}</span>
-                            <span className="donut-legend-value">{pct}% ({count})</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Line Chart: Employee Growth */}
-              <div className="chart-premium-card card-span-6">
-                <h4>Employee Growth Trend</h4>
-                <div className="chart-canvas-wrap">
-                  {monthlyGrowthData ? (
-                    <Line data={monthlyGrowthData} options={lineOptions} />
-                  ) : (
-                    <div className="chart-loading">Loading chart…</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Designation Breakdown */}
-              <div className="chart-premium-card card-span-6">
-                <h4>Designation Breakdown (Top 10)</h4>
-                <div className="chart-canvas-wrap">
-                  {designationChartData ? (
-                    <Bar data={designationChartData} options={barOptions} />
-                  ) : (
-                    <div className="chart-loading">Loading chart…</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Payroll Summary Card */}
-              <div className="chart-premium-card card-span-6 payroll-summary-special">
-                <h4>Payroll Summary (May 2026)</h4>
-                <div className="payroll-visual-card">
-                  {payrollSummary ? (
-                    <div className="payroll-details-inner">
-                      <div className="payroll-item">
-                        <div className="payroll-item-icon total">💰</div>
-                        <div className="payroll-item-text">
-                          <span className="payroll-lbl">Total Payroll</span>
-                          <span className="payroll-val">${payrollSummary.total_salary?.toLocaleString() || "0.00"}</span>
-                        </div>
-                      </div>
-                      <div className="payroll-item">
-                        <div className="payroll-item-icon processed">✓</div>
-                        <div className="payroll-item-text">
-                          <span className="payroll-lbl">Processed</span>
-                          <span className="payroll-val">${payrollSummary.total_salary?.toLocaleString() || "0.00"}</span>
-                        </div>
-                      </div>
-                      <div className="payroll-item">
-                        <div className="payroll-item-icon due">⌛</div>
-                        <div className="payroll-item-text">
-                          <span className="payroll-lbl">Due</span>
-                          <span className="payroll-val">$0.00</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="chart-loading">Loading payroll data...</div>
-                  )}
-                </div>
-                <button className="payroll-view-link" onClick={() => navigate("/payroll")}>
-                  View Payroll Details &rarr;
-                </button>
-              </div>
-
-            </div>
-          </section>
 
           {/* Upload progress indicator */}
           {loading && (
