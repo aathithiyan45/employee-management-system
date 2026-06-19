@@ -159,7 +159,7 @@ function Payroll() {
             <div className="filters-right">
               <input 
                 type="text" 
-                placeholder="🔍 Search name or EMP ID..." 
+                placeholder="Search name or EMP ID..." 
                 className="payroll-input search-input"
                 value={search}
                 onChange={(e) => {
@@ -210,7 +210,13 @@ function Payroll() {
                   <tr>
                     <td colSpan="6" style={{ textAlign: "center", padding: "60px 20px" }}>
                       <div className="empty-state">
-                        <span style={{ fontSize: "30px", display: "block", marginBottom: "10px" }}>📑</span>
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: "10px" }}>
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                          <polyline points="14 2 14 8 20 8" />
+                          <line x1="16" y1="13" x2="8" y2="13" />
+                          <line x1="16" y1="17" x2="8" y2="17" />
+                          <polyline points="10 9 9 9 8 9" />
+                        </svg>
                         <h3 style={{ margin: "0 0 5px 0", color: "var(--grey-800)" }}>No payroll generated yet.</h3>
                         <p style={{ margin: 0, color: "var(--grey-500)" }}>Click "Generate Payroll" to begin calculating this month's salaries.</p>
                       </div>
@@ -231,7 +237,14 @@ function Payroll() {
                         {parseFloat(p.total_hours) === 0 ? (
                           <div className="missing-logs-badge">
                             <div className="no-data-text">No Data</div>
-                            <div className="warning-text">⚠ Missing Work Logs</div>
+                            <div className="warning-text">
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: "4px", verticalAlign: "middle" }}>
+                                <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+                                <line x1="12" y1="9" x2="12" y2="13" />
+                                <line x1="12" y1="17" x2="12.01" y2="17" />
+                              </svg>
+                              Missing Work Logs
+                            </div>
                           </div>
                         ) : (
                           `${p.total_hours} hrs`
@@ -243,7 +256,7 @@ function Payroll() {
                       {/* Better Status UI */}
                       <td className="text-center">
                         <span className={`status-pill ${p.status.toLowerCase()}`}>
-                          {p.status.toLowerCase() === 'paid' ? '🟢 Paid' : '🟠 Pending'}
+                          {p.status.toLowerCase() === 'paid' ? 'Paid' : 'Pending'}
                         </span>
                       </td>
                       

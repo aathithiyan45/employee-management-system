@@ -21,7 +21,7 @@ function ExpiryBadge({ daysLeft, expiryDate }) {
 }
 
 const DOC_META = {
-  passport:      { label: "Passport",      color: "blue",   icon: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zM9 12l2 2 4-4" },
+  passport:      { label: "Passport",      color: "violet", icon: "M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zM9 12l2 2 4-4" },
   work_permit:   { label: "Work Permit",   color: "teal",   icon: "M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" },
   ssic_gt:       { label: "SSIC GT",       color: "indigo", icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" },
   ssic_ht:       { label: "SSIC HT",       color: "purple", icon: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" },
@@ -461,7 +461,7 @@ export default function Documents() {
   };
 
   return (
-    <div className="dashboard-shell">
+    <div className="dashboard-container">
       <Sidebar />
       <div className="dashboard-main">
 
@@ -525,24 +525,26 @@ export default function Documents() {
                   <p>No documents expiring soon</p>
                 </div>
               ) : (
-                <table className="doc-table">
-                  <thead>
-                    <tr><th>Employee</th><th>Division</th><th>Type</th><th>Label</th><th>Expiry</th><th>Status</th></tr>
-                  </thead>
-                  <tbody>
-                    {expiring.map(d => (
-                      <tr key={d.id} className="doc-table-row--clickable"
-                        onClick={() => { handleSelect(d.emp_id, d.emp_name); setTab('docs'); }}>
-                        <td><strong>{d.emp_name}</strong><br /><span className="doc-sub">{d.emp_id}</span></td>
-                        <td>{d.division}</td>
-                        <td><span className={`doc-type-chip doc-type-chip--${DOC_META[d.doc_type]?.color || 'grey'}`}>{d.doc_type_label}</span></td>
-                        <td>{d.label}</td>
-                        <td>{d.expiry_date}</td>
-                        <td><ExpiryBadge daysLeft={d.days_left} expiryDate={d.expiry_date} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-wrapper">
+                  <table className="doc-table">
+                    <thead>
+                      <tr><th>Employee</th><th>Division</th><th>Type</th><th>Label</th><th>Expiry</th><th>Status</th></tr>
+                    </thead>
+                    <tbody>
+                      {expiring.map(d => (
+                        <tr key={d.id} className="doc-table-row--clickable"
+                          onClick={() => { handleSelect(d.emp_id, d.emp_name); setTab('docs'); }}>
+                          <td><strong>{d.emp_name}</strong><br /><span className="doc-sub">{d.emp_id}</span></td>
+                          <td>{d.division}</td>
+                          <td><span className={`doc-type-chip doc-type-chip--${DOC_META[d.doc_type]?.color || 'grey'}`}>{d.doc_type_label}</span></td>
+                          <td>{d.label}</td>
+                          <td>{d.expiry_date}</td>
+                          <td><ExpiryBadge daysLeft={d.days_left} expiryDate={d.expiry_date} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
@@ -629,7 +631,12 @@ export default function Documents() {
                                       Expires: {doc.expiry_date}
                                     </div>
                                   )}
-                                  {doc.notes && <div className="doc-card-notes">📝 {doc.notes}</div>}
+                                  {doc.notes && (
+                                    <div className="doc-card-notes">
+                                      <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z" size={13} stroke="var(--grey-500)" />
+                                      <span>{doc.notes}</span>
+                                    </div>
+                                  )}
                                 </div>
                                 <div className="doc-card-right">
                                   <ExpiryBadge daysLeft={doc.days_left} expiryDate={doc.expiry_date} />
@@ -703,7 +710,9 @@ export default function Documents() {
       {deleteTarget && (
         <div className="custom-confirm-overlay" onClick={() => setDeleteTarget(null)}>
           <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-modal-icon">⚠️</div>
+            <div className="confirm-modal-icon">
+              <Icon d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" size={30} stroke="#ef4444" />
+            </div>
             <h3>Delete Document</h3>
             <p>
               Are you sure you want to delete document <strong>{deleteTarget.label}</strong> permanently?
