@@ -304,11 +304,11 @@ function ImportEmployees() {
   const navigate  = useNavigate();
 
   return (
-    <div className="dashboard-shell">
+    <div className="dashboard-container">
       <Sidebar />
 
       {/* ══ MAIN ══ */}
-      <div className="dashboard-main">
+      <main className="dashboard-main import-employees-page">
         <div className="dashboard-topbar">
           <div className="topbar-title">Import Employee Data</div>
           <div className="topbar-actions">
@@ -326,7 +326,10 @@ function ImportEmployees() {
 
         <div className="dashboard-content">
           <div className="import-page-header">
-            <h2>Upload Employee Excel File</h2>
+            <h2 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <Icon d="M12 20V10M18 20V4M6 20v-4" size={20} stroke="var(--theme-600)" />
+              Upload Employee Excel File
+            </h2>
             <p>
               Upload a single Excel file containing all employees. Use the{" "}
               <strong>IS_ACTIVE</strong> column to mark active (<code>1</code>) or
@@ -341,7 +344,7 @@ function ImportEmployees() {
 
 
         </div>
-      </div>
+      </main>
     </div>
   );
 }

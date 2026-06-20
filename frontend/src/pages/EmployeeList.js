@@ -225,7 +225,9 @@ function EmployeeList() {
           {/* ── Primary Search ── */}
           <div className="filter-group primary">
             <div className="search-wrapper">
-              <span className="search-icon">🔍</span>
+              <span className="search-icon">
+                <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0118 0z" size={14} stroke="var(--grey-400)" />
+              </span>
               <input
                 type="text"
                 placeholder="Search by ID, Name, WP, FIN or SSIC..."
@@ -310,7 +312,10 @@ function EmployeeList() {
 
           {/* ── Date Range ── */}
           <div className="filter-group date-range">
-            <span className="date-label">📅 Joined Between</span>
+            <span className="date-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <Icon d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={14} stroke="var(--grey-500)" />
+              Joined Between
+            </span>
             <input
               type="date"
               value={joinedFrom}
@@ -632,7 +637,9 @@ function EmployeeList() {
       {deleteTarget && (
         <div className="custom-confirm-overlay" onClick={() => setDeleteTarget(null)}>
           <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-modal-icon">⚠️</div>
+            <div className="confirm-modal-icon">
+              <Icon d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01" size={30} stroke="#ef4444" />
+            </div>
             <h3>Delete Employee</h3>
             <p>
               Are you sure you want to delete employee <strong>{deleteTarget.name} ({deleteTarget.id})</strong>?

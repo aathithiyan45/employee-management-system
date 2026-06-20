@@ -9,6 +9,10 @@
   --theme-700: #4338ca;
 }
 
+.documents-page {
+  padding: 32px;
+}
+
 /* ── Tabs ──────────────────────────────────────────────────── */
 .doc-tabs { display:flex; gap:4px; margin-bottom:24px; border-bottom:1.5px solid var(--grey-200); }
 .doc-tab {
@@ -347,4 +351,90 @@
     flex-direction: column !important;
     gap: 8px !important;
   }
+}
+
+/* ── Topbar / Header ────────────────────────────────────────── */
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.topbar-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--grey-900);
+  letter-spacing: -0.4px;
+  margin: 0;
+}
+
+.topbar-sub {
+  font-size: 13px;
+  color: var(--grey-400);
+  margin-top: 4px;
+}
+
+.topbar-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ── Buttons ── */
+.topbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid var(--grey-200);
+  background: var(--white);
+  color: var(--grey-700);
+}
+
+.topbar-btn:hover:not(:disabled) {
+  background: var(--grey-50);
+  border-color: var(--grey-300);
+  color: var(--grey-900);
+}
+
+.topbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.topbar-btn.primary {
+  background: var(--theme-600);
+  color: var(--white);
+  border-color: var(--theme-600);
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2);
+}
+
+.topbar-btn.primary:hover:not(:disabled) {
+  background: var(--theme-700);
+  border-color: var(--theme-700);
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.3);
+}
+
+/* ── Document ID Badge ── */
+.doc-id-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--grey-100);
+  color: var(--grey-600);
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--mono);
+  border: 1px solid var(--grey-200);
+  line-height: 1;
 }

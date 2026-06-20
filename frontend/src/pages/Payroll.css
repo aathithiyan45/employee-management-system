@@ -222,13 +222,13 @@
   transform: translateY(0);
 }
 
-.btn-primary {
+.payroll-page .btn-primary {
   background: #4f46e5;
   color: white;
   box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
 }
 
-.btn-primary:hover:not(:disabled) {
+.payroll-page .btn-primary:hover:not(:disabled) {
   background: #4338ca;
   box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.25);
 }
@@ -302,7 +302,7 @@
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
-.analytics-card.total::after { background: var(--blue-500); }
+.analytics-card.total::after { background: #6366f1; }
 .analytics-card.division::after { background: var(--warning); }
 .analytics-card.earner::after { background: var(--success); }
 
@@ -329,7 +329,7 @@
 .analytics-card.pending-card::after { background: var(--warning); }
 
 .analytics-card.avg::after { background: var(--teal-500); }
-.analytics-card.total .analytics-value { color: var(--blue-700); }
+.analytics-card.total .analytics-value { color: #4f46e5; }
 .analytics-card.division .analytics-value { color: var(--warning); }
 .analytics-card.avg .analytics-value { color: var(--teal-600); }
 .analytics-card.hours .analytics-value { color: var(--purple-600); }
@@ -507,7 +507,7 @@
   transition: all 0.2s ease;
 }
 
-.page-btn:hover:not(:disabled) {
+.payroll-page .page-btn:hover:not(:disabled) {
   background: #eef2ff;
   border-color: #c7d2fe;
   color: #4f46e5;

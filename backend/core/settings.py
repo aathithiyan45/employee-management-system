@@ -1,8 +1,4 @@
-"""
-Django settings for core project.
-All secrets and environment-specific values are loaded from .env
-via python-decouple. Never hardcode credentials here.
-"""
+
 
 from pathlib import Path
 from datetime import timedelta
@@ -56,7 +52,7 @@ INSTALLED_APPS = [
 # NOTE: CorsMiddleware MUST be first in this list
 # ─────────────────────────────────────────────
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',          # ← MUST be first
+    'corsheaders.middleware.CorsMiddleware',         
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -297,13 +293,13 @@ LOGGING = {
     },
 
     'loggers': {
-        # Django internals — INFO and above to show request logs in terminal
+        
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },
-        # Your app — INFO and above (set to DEBUG locally if needed)
+       
         'apps.employees': {
             'handlers': ['console'],
             'level': 'INFO',

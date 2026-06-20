@@ -59,8 +59,11 @@ function PreviewModal({ doc, onClose }) {
     <div className="doc-modal-overlay" onClick={onClose}>
       <div className="doc-preview-modal" onClick={e => e.stopPropagation()}>
         <div className="doc-modal-header">
-          <div>
-            <h3>{doc.label}</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            <h3 style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>{doc.label}</span>
+              <span className="doc-id-badge">ID: {doc.id}</span>
+            </h3>
             <span className="doc-preview-filename">{doc.file_name}</span>
           </div>
           <button className="doc-modal-close" onClick={onClose}>
@@ -463,7 +466,7 @@ export default function Documents() {
   return (
     <div className="dashboard-container">
       <Sidebar />
-      <div className="dashboard-main">
+      <main className="dashboard-main documents-page">
 
         {/* Toast */}
         {toast && (
@@ -617,7 +620,10 @@ export default function Documents() {
                                   <Icon d={meta.icon} size={22} />
                                 </div>
                                 <div className="doc-card-body">
-                                  <div className="doc-card-title">{doc.label}</div>
+                                  <div className="doc-card-title" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                    <span>{doc.label}</span>
+                                    <span className="doc-id-badge">ID: {doc.id}</span>
+                                  </div>
                                   <div className="doc-card-meta">
                                     <span>{doc.file_name}</span>
                                     <span>·</span>
@@ -686,7 +692,7 @@ export default function Documents() {
             </>
           )}
         </div>
-      </div>
+      </main>
 
       {/* Upload modal */}
       {showUpload && (

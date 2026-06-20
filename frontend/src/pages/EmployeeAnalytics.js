@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import axiosInstance from "../axiosInstance";
 import Sidebar from "../components/Sidebar";
-import "./PayrollAnalytics.css"; // Reuse the same premium styles
+import "./EmployeeAnalytics.css";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -22,36 +22,86 @@ ChartJS.register(
   BarElement, ArcElement, Title, Tooltip, Legend, Filler
 );
 
+// ── Premium Colors ─────────────────────────────────────────
 const C = {
-  blue:    "#2196F3",
-  teal:    "#00ACC1",
-  green:   "#2e7d32",
-  amber:   "#f59e0b",
-  rose:    "#e11d48",
-  violet:  "#7c3aed",
-  sky:     "#0ea5e9",
-  slate:   "#64748b",
-  palette: ["#2196F3","#00ACC1","#7c3aed","#f59e0b","#e11d48","#2e7d32","#0ea5e9"],
+  blue:    "#4f46e5", // Brand Violet
+  teal:    "#0ea5e9", // Brand Sky
+  green:   "#10b981", // Success Green
+  amber:   "#f59e0b", // Warning Yellow
+  rose:    "#f43f5e", // Critical Red
+  violet:  "#8b5cf6", // Lavender Accent
+  slate:   "#64748b", // Muted Slate
+  palette: ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6", "#64748b"]
 };
+
+// ── Vector Icon Helper ─────────────────────────────────────
+const Icon = ({ d, size = 18, stroke = "currentColor", fill = "none" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill}
+    stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d={d} />
+  </svg>
+);
 
 const baseChartOpts = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  plugins: { legend: { display: false } }
+};
+
+const verticalBarOpts = {
+  ...baseChartOpts,
   scales: {
-    x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
-    y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
+    x: { 
+      grid: { display: false }, 
+      ticks: { font: { size: 10, family: "var(--font)" }, color: "#9aa5b4" } 
+    },
+    y: { 
+      grid: { color: "rgba(0,0,0,0.04)" }, 
+      ticks: { 
+        font: { size: 10, family: "var(--font)" }, 
+        color: "#9aa5b4",
+        precision: 0,
+        stepSize: 1,
+        beginAtZero: true
+      } 
+    },
+  },
+};
+
+const horizontalBarOpts = {
+  ...baseChartOpts,
+  indexAxis: 'y',
+  scales: {
+    x: { 
+      grid: { color: "rgba(0,0,0,0.04)" }, 
+      ticks: { 
+        font: { size: 10, family: "var(--font)" }, 
+        color: "#9aa5b4",
+        precision: 0,
+        stepSize: 1,
+        beginAtZero: true
+      } 
+    },
+    y: { 
+      grid: { display: false }, 
+      ticks: { 
+        font: { size: 10, weight: "600", family: "var(--font)" }, 
+        color: "#475569" 
+      } 
+    },
   },
 };
 
 function KpiTile({ label, value, sub, accent, icon }) {
   return (
-    <div className="pa-kpi" style={{ "--accent": accent }}>
-      <div className="pa-kpi-icon">{icon}</div>
-      <div className="pa-kpi-body">
-        <div className="pa-kpi-value">{value}</div>
-        <div className="pa-kpi-label">{label}</div>
-        {sub && <div className="pa-kpi-sub">{sub}</div>}
+    <div className="ea-kpi" style={{ "--accent": accent }}>
+      <div className="ea-kpi-icon" style={{ color: accent, background: `${accent}10` }}>
+        {icon}
+      </div>
+      <div className="ea-kpi-body">
+        <div className="ea-kpi-value">{value}</div>
+        <div className="ea-kpi-label">{label}</div>
+        {sub && <div className="ea-kpi-sub">{sub}</div>}
       </div>
     </div>
   );
@@ -59,8 +109,10 @@ function KpiTile({ label, value, sub, accent, icon }) {
 
 function ChartCard({ title, height = 220, children }) {
   return (
-    <div className="pa-card">
-      <div className="pa-card-head"><span className="pa-card-title">{title}</span></div>
+    <div className="ea-card">
+      <div className="ea-card-head">
+        <span className="ea-card-title">{title}</span>
+      </div>
       <div style={{ height, position: "relative" }}>{children}</div>
     </div>
   );
@@ -104,8 +156,11 @@ function EmployeeAnalytics() {
   if (loading) return (
     <div className="dashboard-container">
       <Sidebar />
-      <main className="dashboard-main pa-page">
-        <div className="pa-loading"><div className="pa-spinner" /><span>Loading Employee Analytics…</span></div>
+      <main className="dashboard-main ea-page">
+        <div className="ea-loading">
+          <div className="ea-spinner" />
+          <span>Loading Employee Analytics…</span>
+        </div>
       </main>
     </div>
   );
@@ -113,60 +168,103 @@ function EmployeeAnalytics() {
   return (
     <div className="dashboard-container">
       <Sidebar />
-      <main className="dashboard-main pa-page">
-        <div className="pa-header">
+      <main className="dashboard-main ea-page">
+        <div className="ea-header">
           <div>
-            <h1 className="pa-title">Employee Analytics</h1>
-            <p className="pa-subtitle">Workforce demographics and document compliance</p>
+            <h1 className="ea-title">Employee Analytics</h1>
+            <p className="ea-subtitle">Workforce demographics and document compliance</p>
           </div>
         </div>
 
-        <div className="pa-content">
-          <div className="pa-kpi-row">
-            <KpiTile icon="👥" label="Total Workforce" accent={C.blue} value={summary?.total} sub={`${summary?.active} Active Employees`} />
-            <KpiTile icon="🛡️" label="WP Expiring (60d)" accent={C.amber} value={expiry?.wp_60} sub={`${expiry?.wp_30} within 30 days`} />
-            <KpiTile icon="🛂" label="Passport Alerts" accent={C.rose} value={expiry?.pp_90} sub={`${expiry?.pp_30} critical`} />
-            <KpiTile icon="📈" label="Active Ratio" accent={C.teal} value={summary?.total ? Math.round((summary.active/summary.total)*100) + "%" : "0%"} sub="Employment stability" />
+        <div className="ea-content">
+          <div className="ea-kpi-row">
+            <KpiTile 
+              icon={<Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" stroke={C.blue} />} 
+              label="Total Workforce" 
+              accent={C.blue} 
+              value={summary?.total || 0} 
+              sub={`${summary?.active || 0} Active Employees`} 
+            />
+            <KpiTile 
+              icon={<Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke={C.amber} />} 
+              label="WP Expiring (60d)" 
+              accent={C.amber} 
+              value={expiry?.wp_60 || 0} 
+              sub={`${expiry?.wp_30 || 0} within 30 days`} 
+            />
+            <KpiTile 
+              icon={<Icon d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" stroke={C.rose} />} 
+              label="Passport Alerts" 
+              accent={C.rose} 
+              value={expiry?.pp_90 || 0} 
+              sub={`${expiry?.pp_30 || 0} critical`} 
+            />
+            <KpiTile 
+              icon={<Icon d="M23 6l-9.5 9.5-5-5L1 18M17 6h6v6" stroke={C.teal} />} 
+              label="Active Ratio" 
+              accent={C.teal} 
+              value={summary?.total ? Math.round((summary.active/summary.total)*100) + "%" : "0%"} 
+              sub="Employment stability" 
+            />
           </div>
 
-          <div className="pa-grid pa-grid-7-5">
-            <ChartCard title="Hiring Trend (Last 5 Years)">
+          <div className="ea-grid ea-grid-7-5">
+            <ChartCard title="Hiring Trend (Last 5 Years)" height={210}>
               <Bar 
                 data={{
                   labels: hiring.map(x => x.year),
                   datasets: [{ data: hiring.map(x => x.count), backgroundColor: C.blue, borderRadius: 6 }]
                 }} 
-                options={baseChartOpts}
+                options={verticalBarOpts}
               />
             </ChartCard>
-            <ChartCard title="Division Distribution">
-              <Doughnut 
-                data={{
-                  labels: division.map(x => x.name),
-                  datasets: [{ data: division.map(x => x.value), backgroundColor: C.palette, borderWidth: 0 }]
-                }}
-                options={{ ...baseChartOpts, cutout: "70%" }}
-              />
+            
+            <ChartCard title="Division Distribution" height={210}>
+              <div className="ea-donut-wrap">
+                <div className="ea-donut-chart">
+                  <Doughnut 
+                    data={{
+                      labels: division.map(x => x.name),
+                      datasets: [{ data: division.map(x => x.value), backgroundColor: C.palette, borderWidth: 0, hoverOffset: 4 }]
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      cutout: "70%",
+                      plugins: { legend: { display: false } }
+                    }}
+                  />
+                </div>
+                <div className="ea-donut-legend">
+                  {division.slice(0, 5).map((d, i) => (
+                    <div key={i} className="ea-legend-item">
+                      <span className="ea-legend-dot" style={{ background: C.palette[i % C.palette.length] }} />
+                      <span className="ea-legend-name">{d.name}</span>
+                      <span className="ea-legend-val">{d.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </ChartCard>
           </div>
 
-          <div className="pa-grid pa-grid-6-6">
-            <ChartCard title="Top Nationalities">
+          <div className="ea-grid ea-grid-6-6">
+            <ChartCard title="Top Nationalities" height={210}>
               <Bar 
                 data={{
                   labels: nationality.map(x => x.name),
                   datasets: [{ data: nationality.map(x => x.value), backgroundColor: C.teal, borderRadius: 4 }]
                 }}
-                options={{ ...baseChartOpts, indexAxis: 'y' }}
+                options={horizontalBarOpts}
               />
             </ChartCard>
-            <ChartCard title="Top Designations">
+            <ChartCard title="Top Designations" height={210}>
               <Bar 
                 data={{
                   labels: designation.map(x => x.name),
                   datasets: [{ data: designation.map(x => x.value), backgroundColor: C.violet, borderRadius: 4 }]
                 }}
-                options={{ ...baseChartOpts, indexAxis: 'y' }}
+                options={horizontalBarOpts}
               />
             </ChartCard>
           </div>

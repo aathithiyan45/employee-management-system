@@ -255,7 +255,7 @@ function Invoices() {
             {currentPage > 1 && (
               <button 
                 onClick={() => paginate(1)}
-                style={{ background: "white", border: "1px solid var(--grey-300)", padding: "8px 12px", borderRadius: "var(--radius-md)", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontWeight: "600", color: "var(--grey-700)" }}
+                className="btn-back-page1"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -450,11 +450,11 @@ function Invoices() {
 
             {/* ── Pagination Controls ─────────────────────────────────── */}
             {totalPages > 1 && (
-              <div className="pagination" style={{ display: "flex", justifyContent: "center", gap: "10px", padding: "20px", background: "var(--grey-50)", borderTop: "1px solid var(--grey-200)" }}>
+              <div className="pagination">
                 <button 
                   disabled={currentPage === 1}
                   onClick={() => paginate(currentPage - 1)}
-                  style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid var(--grey-300)", background: "white", cursor: currentPage === 1 ? "not-allowed" : "pointer", opacity: currentPage === 1 ? 0.5 : 1, fontWeight: "600" }}
+                  className="page-control-btn"
                 >
                   Previous
                 </button>
@@ -462,16 +462,7 @@ function Invoices() {
                   <button
                     key={i}
                     onClick={() => paginate(i + 1)}
-                    style={{ 
-                      padding: "8px 14px", 
-                      borderRadius: "6px", 
-                      border: "1px solid",
-                      borderColor: currentPage === i + 1 ? "var(--blue-500)" : "var(--grey-300)",
-                      background: currentPage === i + 1 ? "var(--blue-500)" : "white",
-                      color: currentPage === i + 1 ? "white" : "var(--grey-700)",
-                      cursor: "pointer",
-                      fontWeight: "700"
-                    }}
+                    className={`page-number-btn ${currentPage === i + 1 ? "active" : ""}`}
                   >
                     {i + 1}
                   </button>
@@ -479,7 +470,7 @@ function Invoices() {
                 <button 
                   disabled={currentPage === totalPages}
                   onClick={() => paginate(currentPage + 1)}
-                  style={{ padding: "8px 16px", borderRadius: "6px", border: "1px solid var(--grey-300)", background: "white", cursor: currentPage === totalPages ? "not-allowed" : "pointer", opacity: currentPage === totalPages ? 0.5 : 1, fontWeight: "600" }}
+                  className="page-control-btn"
                 >
                   Next
                 </button>
@@ -492,7 +483,11 @@ function Invoices() {
       {deleteTarget && (
         <div className="custom-confirm-overlay" onClick={() => setDeleteTarget(null)}>
           <div className="custom-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-modal-icon">⚠️</div>
+            <div className="confirm-modal-icon">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
+              </svg>
+            </div>
             <h3>Delete Invoice</h3>
             <p>
               Are you sure you want to delete invoice <strong>{deleteTarget.invoiceNo}</strong>?
