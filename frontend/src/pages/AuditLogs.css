@@ -327,3 +327,80 @@
     padding: 10px 12px;
   }
 }
+
+/* ── Pagination Footer ── */
+.audit-logs-page .audit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--white);
+  border-top: 1px solid var(--grey-100);
+}
+
+.audit-logs-page .audit-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--white);
+  border: 1.5px solid var(--grey-200);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--grey-600);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.audit-logs-page .audit-page-btn:hover:not(:disabled) {
+  border-color: var(--theme-500);
+  color: var(--theme-600);
+  background: var(--theme-50);
+}
+
+.audit-logs-page .audit-page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.audit-logs-page .audit-page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.audit-logs-page .audit-page-num {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--grey-600);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.audit-logs-page .audit-page-num:hover:not(.active) {
+  background: var(--grey-50);
+  color: var(--grey-800);
+  border-color: var(--grey-200);
+}
+
+.audit-logs-page .audit-page-num.active {
+  background: var(--theme-600);
+  color: var(--white);
+}
+
+.audit-logs-page .audit-page-dots {
+  padding: 0 4px;
+  color: var(--grey-400);
+  font-size: 13px;
+  user-select: none;
+}
+

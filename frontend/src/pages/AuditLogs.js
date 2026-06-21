@@ -6,7 +6,7 @@ import './AuditLogs.css';
 // ── Icons Helper ──────────────────────────────────────────
 const Icon = ({ d, size = 18, stroke = "currentColor", fill = "none" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill={fill}
-    stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
     <path d={d} />
   </svg>
 );
@@ -15,22 +15,35 @@ const AuditLogs = () => {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [page, setPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
     const [filters, setFilters] = useState({
         user: '',
         action: '',
         date: ''
     });
 
-    const fetchLogs = useCallback(async () => {
+    const PAGE_SIZE = 15;
+
+    const fetchLogs = useCallback(async (targetPage = 1) => {
         setLoading(true);
         try {
             const params = new URLSearchParams();
             if (filters.user) params.append('user', filters.user);
             if (filters.action) params.append('action', filters.action);
             if (filters.date) params.append('date', filters.date);
+            params.append('page', targetPage);
 
             const res = await api.get(`audit-logs/?${params.toString()}`);
-            setLogs(res.data);
+            
+            if (res.data && res.data.results !== undefined) {
+                setLogs(res.data.results);
+                setTotalCount(res.data.count);
+            } else {
+                setLogs(res.data || []);
+                setTotalCount((res.data || []).length);
+            }
+            setPage(targetPage);
             setError('');
         } catch (err) {
             setError('Failed to fetch audit logs.');
@@ -40,7 +53,7 @@ const AuditLogs = () => {
     }, [filters]);
 
     useEffect(() => {
-        fetchLogs();
+        fetchLogs(1);
     }, [fetchLogs]);
 
     const handleFilterChange = (e) => {
@@ -54,6 +67,8 @@ const AuditLogs = () => {
         return 'action-info';
     };
 
+    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
     return (
         <div className="dashboard-container">
             <Sidebar />
@@ -63,7 +78,7 @@ const AuditLogs = () => {
                 <div className="dashboard-topbar">
                     <div className="topbar-title">Audit Logs</div>
                     <div className="topbar-actions">
-                        <button className="topbar-btn" onClick={fetchLogs} title="Refresh Logs">
+                        <button className="topbar-btn" onClick={() => fetchLogs(1)} title="Refresh Logs">
                             <Icon d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" size={15} />
                             Refresh
                         </button>
@@ -115,7 +130,7 @@ const AuditLogs = () => {
                             />
                         </div>
 
-                        <button onClick={fetchLogs} className="btn-primary">
+                        <button onClick={() => fetchLogs(1)} className="btn-primary">
                             <Icon d="M22 3H2l8 9v6l4 2v-8z" size={14} stroke="white" />
                             Apply Filters
                         </button>
@@ -165,6 +180,57 @@ const AuditLogs = () => {
                                     )}
                                 </tbody>
                             </table>
+
+                            {/* ── Pagination footer panel ── */}
+                            {totalPages > 1 && (
+                                <div className="audit-pagination">
+                                    <button 
+                                        className="audit-page-btn" 
+                                        onClick={() => fetchLogs(page - 1)} 
+                                        disabled={page === 1}
+                                    >
+                                        <Icon d="M15 18l-6-6 6-6" size={14} />
+                                        Previous
+                                    </button>
+                                    
+                                    <div className="audit-page-numbers">
+                                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => {
+                                            const isFirstOrLast = p === 1 || p === totalPages;
+                                            const isNearCurrent = Math.abs(p - page) <= 1;
+                                            
+                                            if (isFirstOrLast || isNearCurrent) {
+                                                return (
+                                                    <button 
+                                                        key={p} 
+                                                        className={`audit-page-num ${page === p ? 'active' : ''}`}
+                                                        onClick={() => fetchLogs(p)}
+                                                    >
+                                                        {p}
+                                                    </button>
+                                                );
+                                            }
+                                            
+                                            if (p === 2 && page > 3) {
+                                                return <span key={p} className="audit-page-dots">...</span>;
+                                            }
+                                            if (p === totalPages - 1 && page < totalPages - 2) {
+                                                return <span key={p} className="audit-page-dots">...</span>;
+                                            }
+                                            
+                                            return null;
+                                        })}
+                                    </div>
+
+                                    <button 
+                                        className="audit-page-btn" 
+                                        onClick={() => fetchLogs(page + 1)} 
+                                        disabled={page === totalPages}
+                                    >
+                                        Next
+                                        <Icon d="M9 18l6-6-6-6" size={14} />
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

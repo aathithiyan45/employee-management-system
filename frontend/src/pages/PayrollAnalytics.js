@@ -24,16 +24,23 @@ ChartJS.register(
 
 // ── Palette ────────────────────────────────────────────────────────────────
 const C = {
-  blue:    "#2196F3",
-  teal:    "#00ACC1",
-  green:   "#2e7d32",
-  amber:   "#f59e0b",
-  rose:    "#e11d48",
-  violet:  "#7c3aed",
-  sky:     "#0ea5e9",
-  slate:   "#64748b",
-  divPalette: ["#2196F3","#00ACC1","#7c3aed","#f59e0b","#e11d48","#2e7d32","#0ea5e9"],
+  blue:    "#4f46e5", // Brand Violet
+  teal:    "#0ea5e9", // Brand Sky
+  green:   "#10b981", // Success Green
+  amber:   "#f59e0b", // Warning Yellow
+  rose:    "#f43f5e", // Critical Red
+  violet:  "#8b5cf6", // Lavender Accent
+  slate:   "#64748b", // Slate Muted
+  divPalette: ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#f43f5e", "#8b5cf6", "#64748b"],
 };
+
+// ── Vector Icon Helper ─────────────────────────────────────────────────────
+const Icon = ({ d, size = 18, stroke = "currentColor", fill = "none" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill}
+    stroke={stroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d={d} />
+  </svg>
+);
 
 const baseChartOpts = {
   responsive: true,
@@ -41,8 +48,8 @@ const baseChartOpts = {
   animation: { duration: 600 },
   plugins: { legend: { display: false } },
   scales: {
-    x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11, family: "'DM Sans'" }, color: "#9aa5b4" } },
-    y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11, family: "'DM Sans'" }, color: "#9aa5b4" } },
+    x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10, family: "var(--font)" }, color: "#9aa5b4" } },
+    y: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10, family: "var(--font)" }, color: "#9aa5b4" } },
   },
 };
 
@@ -50,7 +57,9 @@ const baseChartOpts = {
 function KpiTile({ label, value, sub, accent, icon }) {
   return (
     <div className="pa-kpi" style={{ "--accent": accent }}>
-      <div className="pa-kpi-icon">{icon}</div>
+      <div className="pa-kpi-icon" style={{ color: accent, background: `${accent}10` }}>
+        {icon}
+      </div>
       <div className="pa-kpi-body">
         <div className="pa-kpi-value">{value}</div>
         <div className="pa-kpi-label">{label}</div>
@@ -147,7 +156,7 @@ function PayrollAnalytics() {
     datasets: [{
       data: trend.map(d => d.total),
       borderColor: C.blue,
-      backgroundColor: "rgba(33,150,243,0.08)",
+      backgroundColor: "rgba(79, 70, 229, 0.08)",
       fill: true, tension: 0.45,
       pointRadius: 4, pointBackgroundColor: C.blue,
       borderWidth: 2,
@@ -169,7 +178,7 @@ function PayrollAnalytics() {
     datasets: [{
       data: topEmps.map(d => d.total),
       backgroundColor: topEmps.map((_, i) =>
-        i === 0 ? C.blue : i === 1 ? C.teal : "rgba(33,150,243,0.25)"
+        i === 0 ? C.blue : i === 1 ? C.teal : "rgba(79, 70, 229, 0.25)"
       ),
       borderRadius: 5,
       borderSkipped: false,
@@ -239,7 +248,9 @@ function PayrollAnalytics() {
           </div>
         ) : !hasData ? (
           <div className="pa-empty">
-            <div className="pa-empty-icon">📊</div>
+            <div className="pa-empty-icon" style={{ color: "var(--theme-500)", display: "flex", justifyContent: "center", marginBottom: "16px" }}>
+              <Icon d="M18 20V10M12 20V4M6 20v-8" size={48} stroke="var(--theme-500)" />
+            </div>
             <h3>No payroll data for {year}</h3>
             <p>Generate payroll from the Monthly Payroll page first.</p>
           </div>
@@ -249,32 +260,45 @@ function PayrollAnalytics() {
             {/* ── KPI Strip ──────────────────────────────────────────── */}
             <div className="pa-kpi-row">
               <KpiTile
-                icon="💰" label="Total Payout" accent={C.blue}
+                icon={<Icon d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke={C.blue} />}
+                label="Total Payout" accent={C.blue}
                 value={fmt(totalPayout)}
                 sub={`${trend.length} months recorded`}
               />
               <KpiTile
-                icon="📈" label="Peak Month" accent={C.teal}
+                icon={<Icon d="M23 6l-9.5 9.5-5-5L1 18M17 6h6v6" stroke={C.teal} />}
+                label="Peak Month" accent={C.teal}
                 value={peakMonth?.month || "—"}
                 sub={peakMonth ? fmt(peakMonth.total) : ""}
               />
               <KpiTile
-                icon="🏢" label="Top Division" accent={C.violet}
+                icon={<Icon d="M3 21h18M3 7V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2M5 21V7m14 14V7M9 7v14M15 7v14" stroke={C.violet} />}
+                label="Top Division" accent={C.violet}
                 value={topDivision?.name || "—"}
                 sub={topDivision ? fmt(topDivision.value) : ""}
               />
               <KpiTile
-                icon="🏆" label="Top Earner" accent={C.amber}
+                icon={<Icon d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke={C.amber} />}
+                label="Top Earner" accent={C.amber}
                 value={topEarner?.name?.split(" ")[0] || "—"}
                 sub={topEarner ? fmt(topEarner.total) : ""}
               />
               {alerts && <>
-                <KpiTile icon="⚠️" label="High Salary" accent={C.rose}
-                  value={alerts.high_salary} sub="> $2,000 threshold" />
-                <KpiTile icon="🕐" label="Overtime" accent={C.amber}
-                  value={alerts.overtime} sub="> 220 hrs" />
-                <KpiTile icon="📉" label="Low Hours" accent={C.slate}
-                  value={alerts.low_work} sub="< 80 hrs" />
+                <KpiTile 
+                  icon={<Icon d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" stroke={C.rose} />} 
+                  label="High Salary" accent={C.rose}
+                  value={alerts.high_salary} sub="> $2,000 threshold" 
+                />
+                <KpiTile 
+                  icon={<Icon d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke={C.amber} />} 
+                  label="Overtime" accent={C.amber}
+                  value={alerts.overtime} sub="> 220 hrs" 
+                />
+                <KpiTile 
+                  icon={<Icon d="M23 18H1M17 6l-9.5 9.5-5-5L1 18" stroke={C.slate} />} 
+                  label="Low Hours" accent={C.slate}
+                  value={alerts.low_work} sub="< 80 hrs" 
+                />
               </>}
             </div>
 
@@ -321,7 +345,7 @@ function PayrollAnalytics() {
                   <div className="pa-donut-legend">
                     {division.slice(0, 6).map((d, i) => (
                       <div key={i} className="pa-legend-item">
-                        <span className="pa-legend-dot" style={{ background: C.divPalette[i] }} />
+                        <span className="pa-legend-dot" style={{ background: C.divPalette[i % C.divPalette.length] }} />
                         <span className="pa-legend-name">{d.name}</span>
                         <span className="pa-legend-val">{fmt(d.value)}</span>
                       </div>
@@ -346,8 +370,8 @@ function PayrollAnalytics() {
                       },
                     },
                     scales: {
-                      x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
-                      y: { grid: { display: false }, ticks: { font: { size: 12, weight: "600" }, color: "#2d3748" } },
+                      x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 }, color: "#9aa5b4" } },
+                      y: { grid: { display: false }, ticks: { font: { size: 10, weight: "600" }, color: "#2d3748" } },
                     },
                   }}
                 />
@@ -358,11 +382,16 @@ function PayrollAnalytics() {
                   data={desigChartData}
                   options={{
                     ...baseChartOpts,
+                    indexAxis: "y",
                     plugins: {
                       legend: { display: false },
                       tooltip: {
                         callbacks: { label: ctx => ` $${Number(ctx.raw).toLocaleString()}` },
                       },
+                    },
+                    scales: {
+                      x: { grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 }, color: "#9aa5b4" } },
+                      y: { grid: { display: false }, ticks: { font: { size: 9, weight: "600" }, color: "#2d3748" } },
                     },
                   }}
                 />
@@ -423,8 +452,8 @@ function PayrollAnalytics() {
                       },
                     },
                     scales: {
-                      x: { title: { display: true, text: "Hours", font: { size: 11 }, color: "#9aa5b4" }, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
-                      y: { title: { display: true, text: "Salary ($)", font: { size: 11 }, color: "#9aa5b4" }, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 11 }, color: "#9aa5b4" } },
+                      x: { title: { display: true, text: "Hours", font: { size: 10 }, color: "#9aa5b4" }, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 }, color: "#9aa5b4" } },
+                      y: { title: { display: true, text: "Salary ($)", font: { size: 10 }, color: "#9aa5b4" }, grid: { color: "rgba(0,0,0,0.04)" }, ticks: { font: { size: 10 }, color: "#9aa5b4" } },
                     },
                   }}
                 />

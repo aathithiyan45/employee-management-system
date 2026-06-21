@@ -1,37 +1,53 @@
-/* ── PayrollAnalytics.css ─────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   PayrollAnalytics.css — Scoped Brand Theme Styles
+   ═══════════════════════════════════════════════════════════════ */
 
-/* Page shell */
 .pa-page {
-  padding: 28px 32px;
+  padding: 32px;
   background: var(--grey-100);
   min-height: 100vh;
+  --theme-50: #eef2ff;
+  --theme-100: #e0e7ff;
+  --theme-200: #c7d2fe;
+  --theme-300: #a5b4fc;
+  --theme-400: #818cf8;
+  --theme-500: #6366f1;
+  --theme-600: #4f46e5;
+  --theme-700: #4338ca;
+  --theme-800: #3730a3;
+  --theme-900: #312e81;
 }
 
-/* ── Header ────────────────────────────────────────────────────────────────── */
-.pa-header {
+/* ── Header ── */
+.pa-page .pa-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
+  animation: paFadeDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.pa-title {
+@keyframes paFadeDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pa-page .pa-title {
   font-size: 20px;
   font-weight: 700;
   color: var(--grey-900);
-  letter-spacing: -0.4px;
-  margin: 0 0 3px 0;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.02em;
 }
 
-.pa-subtitle {
-  font-size: 12.5px;
+.pa-page .pa-subtitle {
+  font-size: 13px;
   color: var(--grey-400);
-  font-weight: 400;
   margin: 0;
 }
 
-.pa-year-select {
-  padding: 7px 12px;
+.pa-page .pa-year-select {
+  padding: 6px 12px;
   border: 1.5px solid var(--grey-200);
   border-radius: var(--radius-md);
   font-family: var(--font);
@@ -41,12 +57,17 @@
   background: var(--white);
   cursor: pointer;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
-.pa-year-select:focus { border-color: var(--blue-500); }
 
-/* ── Loading & Empty ───────────────────────────────────────────────────────── */
-.pa-loading {
+.pa-page .pa-year-select:focus {
+  border-color: var(--theme-500);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* ── Loading & Empty ── */
+.pa-page .pa-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -57,177 +78,196 @@
   font-size: 14px;
 }
 
-.pa-spinner {
+.pa-page .pa-spinner {
   width: 28px;
   height: 28px;
   border: 3px solid var(--grey-200);
-  border-top-color: var(--blue-500);
+  border-top-color: var(--theme-600);
   border-radius: 50%;
-  animation: pa-spin 0.8s linear infinite;
+  animation: paSpin 0.8s linear infinite;
 }
-@keyframes pa-spin { to { transform: rotate(360deg); } }
 
-.pa-empty {
+@keyframes paSpin { to { transform: rotate(360deg); } }
+
+.pa-page .pa-empty {
   background: var(--white);
   border: 1px solid var(--grey-200);
   border-radius: var(--radius-lg);
   padding: 60px 20px;
   text-align: center;
+  box-shadow: var(--shadow-sm);
+  animation: paFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.pa-empty-icon { font-size: 36px; margin-bottom: 12px; }
-.pa-empty h3 { font-size: 16px; color: var(--grey-800); margin-bottom: 6px; }
-.pa-empty p  { font-size: 13px; color: var(--grey-400); }
 
-/* ── Content wrapper ───────────────────────────────────────────────────────── */
-.pa-content {
+.pa-page .pa-empty h3 {
+  font-size: 16px;
+  color: var(--grey-800);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.pa-page .pa-empty p {
+  font-size: 13px;
+  color: var(--grey-400);
+}
+
+/* ── Content ── */
+.pa-page .pa-content {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* ── KPI Row ───────────────────────────────────────────────────────────────── */
-.pa-kpi-row {
+/* ── KPI Row ── */
+.pa-page .pa-kpi-row {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.pa-kpi {
+.pa-page .pa-kpi {
   flex: 1;
-  min-width: 130px;
+  min-width: 180px;
   background: var(--white);
   border: 1px solid var(--grey-200);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-.pa-kpi:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
-
-.pa-kpi::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: var(--accent);
-  border-radius: 99px 0 0 99px;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  animation: paFadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.pa-kpi-icon {
-  font-size: 20px;
+.pa-page .pa-kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.pa-page .pa-kpi-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  line-height: 1;
 }
 
-.pa-kpi-body { min-width: 0; }
+.pa-page .pa-kpi-body {
+  min-width: 0;
+}
 
-.pa-kpi-value {
-  font-size: 18px;
+.pa-page .pa-kpi-value {
+  font-size: 17px;
   font-weight: 700;
   color: var(--grey-900);
-  letter-spacing: -0.5px;
   line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pa-kpi-label {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--grey-400);
-  margin-top: 3px;
-}
-
-.pa-kpi-sub {
-  font-size: 11px;
-  color: var(--grey-400);
-  margin-top: 2px;
   font-family: var(--mono);
 }
 
-/* ── Grid layouts ──────────────────────────────────────────────────────────── */
-.pa-grid {
+.pa-page .pa-kpi-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--grey-400);
+  margin-top: 4px;
+}
+
+.pa-page .pa-kpi-sub {
+  font-size: 11px;
+  color: var(--grey-400);
+  margin-top: 2px;
+}
+
+/* ── Grid Layouts ── */
+.pa-page .pa-grid {
   display: grid;
   gap: 16px;
 }
 
-.pa-grid-7-5 { grid-template-columns: 7fr 5fr; }
-.pa-grid-5-7 { grid-template-columns: 5fr 7fr; }
-.pa-grid-6-6 { grid-template-columns: 1fr 1fr; }
+.pa-page .pa-grid-7-5 { grid-template-columns: 7fr 5fr; }
+.pa-page .pa-grid-5-7 { grid-template-columns: 5fr 7fr; }
+.pa-page .pa-grid-6-6 { grid-template-columns: 1fr 1fr; }
 
-/* ── Chart Card ────────────────────────────────────────────────────────────── */
-.pa-card {
+/* ── Chart Card ── */
+.pa-page .pa-card {
   background: var(--white);
   border: 1px solid var(--grey-200);
   border-radius: var(--radius-lg);
-  padding: 18px 20px 20px;
+  padding: 20px;
   box-shadow: var(--shadow-sm);
-  transition: box-shadow 0.15s;
+  transition: box-shadow 0.2s ease;
+  animation: paFadeUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-.pa-card:hover { box-shadow: var(--shadow-md); }
 
-.pa-card-head {
+.pa-page .pa-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+@keyframes paFadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pa-page .pa-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
-.pa-card-title {
-  font-size: 13px;
+.pa-page .pa-card-title {
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--grey-800);
-  letter-spacing: -0.2px;
+  letter-spacing: -0.01em;
 }
 
-/* ── Doughnut layout ───────────────────────────────────────────────────────── */
-.pa-donut-wrap {
+/* ── Doughnut Layout ── */
+.pa-page .pa-donut-wrap {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   height: 100%;
 }
 
-.pa-donut-chart {
+.pa-page .pa-donut-chart {
   flex-shrink: 0;
   width: 140px;
   height: 140px;
   position: relative;
 }
 
-.pa-donut-legend {
+.pa-page .pa-donut-legend {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
   overflow: hidden;
 }
 
-.pa-legend-item {
+.pa-page .pa-legend-item {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
 }
 
-.pa-legend-dot {
+.pa-page .pa-legend-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.pa-legend-name {
-  font-size: 11.5px;
-  color: var(--grey-700, #4a5568);
+.pa-page .pa-legend-name {
+  font-size: 12px;
+  color: var(--grey-700);
   font-weight: 500;
   flex: 1;
   overflow: hidden;
@@ -235,33 +275,38 @@
   white-space: nowrap;
 }
 
-.pa-legend-val {
+.pa-page .pa-legend-val {
   font-size: 11px;
   font-family: var(--mono);
-  color: var(--grey-500, #718096);
-  font-weight: 500;
+  color: var(--grey-400);
+  font-weight: 600;
   flex-shrink: 0;
 }
 
-/* ── Employee select ───────────────────────────────────────────────────────── */
-.pa-emp-select {
-  padding: 5px 10px;
+/* ── Employee Select ── */
+.pa-page .pa-emp-select {
+  padding: 6px 12px;
   border: 1.5px solid var(--grey-200);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-family: var(--font);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--grey-700, #4a5568);
-  background: var(--grey-50);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--grey-800);
+  background: var(--white);
   outline: none;
   cursor: pointer;
   max-width: 200px;
-  transition: border-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
 }
-.pa-emp-select:focus { border-color: var(--blue-500); }
 
-/* ── Placeholder ───────────────────────────────────────────────────────────── */
-.pa-placeholder {
+.pa-page .pa-emp-select:focus {
+  border-color: var(--theme-500);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+}
+
+/* ── Placeholder ── */
+.pa-page .pa-placeholder {
   height: 100%;
   display: flex;
   align-items: center;
@@ -271,18 +316,33 @@
   font-style: italic;
 }
 
-/* ── Responsive ────────────────────────────────────────────────────────────── */
+/* ── Responsive Styling ── */
 @media (max-width: 1100px) {
-  .pa-grid-7-5,
-  .pa-grid-5-7,
-  .pa-grid-6-6 { grid-template-columns: 1fr; }
-
-  .pa-kpi { min-width: 140px; }
+  .pa-page .pa-grid-7-5,
+  .pa-page .pa-grid-5-7,
+  .pa-page .pa-grid-6-6 {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
-  .pa-page { padding: 20px 16px; }
-  .pa-kpi-row { gap: 8px; }
-  .pa-kpi { padding: 12px 14px; }
-  .pa-kpi-value { font-size: 16px; }
+  .pa-page {
+    padding: 20px 16px;
+  }
+  .pa-page .pa-kpi-row {
+    grid-template-columns: 1fr 1fr;
+    display: grid;
+    gap: 10px;
+  }
+  .pa-page .pa-kpi {
+    min-width: unset;
+  }
+  .pa-page .pa-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .pa-page .pa-year-select {
+    width: 100%;
+  }
 }

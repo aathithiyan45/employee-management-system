@@ -8,6 +8,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from apps.accounts.permissions import IsAdminOrHR
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 from apps.employees.models import Employee
 from .models import AuditLog
@@ -137,7 +138,7 @@ def audit_log_list(request):
     action_query = request.GET.get('action')
     date_query = request.GET.get('date')
 
-    queryset = AuditLog.objects.all().select_related('user')
+    queryset = AuditLog.objects.all().select_related('user').order_by('-created_at')
 
     if user_query:
         queryset = queryset.filter(
@@ -152,9 +153,12 @@ def audit_log_list(request):
     if date_query:
         queryset = queryset.filter(created_at__date=date_query)
 
-    # Simple manual serialization for brevity
+    paginator = PageNumberPagination()
+    paginator.page_size = 15
+    paginated_queryset = paginator.paginate_queryset(queryset, request)
+
     data = []
-    for log in queryset[:100]: # Limit to 100 for performance
+    for log in paginated_queryset:
         data.append({
             'id': log.id,
             'timestamp': log.created_at,
@@ -164,4 +168,4 @@ def audit_log_list(request):
             'ip_address': log.ip_address
         })
 
-    return Response(data)
+    return paginator.get_paginated_response(data)

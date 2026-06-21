@@ -105,7 +105,7 @@ class PayrollByDesignationView(views.APIView):
             .filter(month__year=year)
             .values(name=F("employee__designation_ipa"))
             .annotate(value=Sum("total_salary"))
-            .order_by("-value")
+            .order_by("-value")[:10]
         )
         return Response([
             {"name": d["name"] or "Unknown", "value": float(d["value"] or 0.0)}
