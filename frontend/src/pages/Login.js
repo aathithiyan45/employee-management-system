@@ -32,7 +32,6 @@ function Login() {
   const selectedRole = ROLES.find(r => r.id === role);
 
   const handleLogin = async () => {
-    console.log("Login attempt started for:", username, "Role selected:", role);
     setError("");
     
     if (!username || !password) {
@@ -44,13 +43,9 @@ function Login() {
     try {
       const res = await axios.post(`${API_BASE}login/`, { username, password }, { withCredentials: true });
       const data = res.data;
-      
-      console.log("Backend response received:", data);
 
       // 1. Check response using data.status === "success"
       if (data.status === "success") {
-        console.log("Login successful!");
-
         // 2. Store JWT token in localStorage
         localStorage.setItem("access_token", data.access);
         
@@ -63,7 +58,6 @@ function Login() {
 
         // 3. Handle password change requirement
         if (data.must_change_password) {
-          console.log("User must change password. Redirecting...");
           navigate("/change-password");
           return;
         }
@@ -71,7 +65,6 @@ function Login() {
         // 4. Handle role-based login & Redirect to /dashboard
         // We use the mapping to ensure Admin goes to /dashboard and others to their portals
         const targetPath = ROLE_HOME[data.role] || "/dashboard";
-        console.log("Redirecting to:", targetPath);
         navigate(targetPath);
         
       } else {

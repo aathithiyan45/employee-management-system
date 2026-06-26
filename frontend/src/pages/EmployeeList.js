@@ -46,31 +46,110 @@ function EmployeeList() {
   const [user, setUser] = useState(null);
   const [toast, setToast] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [alertCounts, setAlertCounts] = useState({
-    total_employees: 0,
-    active_employees: 0,
-    inactive_employees: 0,
-    incomplete_profiles: 0,
-    passport_expiring: 0,
-    wp_expiring: 0,
-    ssic_gt_expiring: 0,
+  const [metrics, setMetrics] = useState({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    alerts: 0,
   });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
   };
 
-  // Get user info and alert counts on mount
+  // Get user info on mount
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
     setUser(userData);
-
-    api.get("dashboard/?division=all")
-      .then((res) => {
-        setAlertCounts(res.data);
-      })
-      .catch((err) => console.error("Error loading alert counts:", err));
   }, []);
+
+  // ── Dynamic KPI metrics calculation ────────────────────────
+  const updateMetrics = useCallback(() => {
+    const hasOtherFilters = !!(
+      status ||
+      search ||
+      designation ||
+      nationality ||
+      docType ||
+      joinedFrom ||
+      joinedTo ||
+      incomplete
+    );
+
+    if (!hasOtherFilters) {
+      api.get(`dashboard/?division=${division || "all"}`)
+        .then((res) => {
+          const d = res.data;
+          setMetrics({
+            total: d.total_employees || 0,
+            active: d.active_employees || 0,
+            inactive: d.inactive_employees || 0,
+            alerts: (d.incomplete_profiles || 0) + (d.passport_expiring || 0) + (d.wp_expiring || 0) + (d.ssic_gt_expiring || 0),
+          });
+        })
+        .catch((err) => console.error("Error loading metrics:", err));
+    } else {
+      api.get("employees/", {
+        params: {
+          division,
+          status,
+          search,
+          designation,
+          nationality,
+          doc_type: docType,
+          days: expiryDays,
+          joined_from: joinedFrom,
+          joined_to: joinedTo,
+          incomplete,
+          page: 1,
+          page_size: 100, // get up to 100 to compute dynamic values
+        }
+      })
+      .then((res) => {
+        const results = res.data.results || res.data;
+        const totalCount = res.data.count || results.length;
+        
+        let activeCount = 0;
+        let inactiveCount = 0;
+        let alertsCount = 0;
+        
+        const today = new Date();
+        const next60 = new Date();
+        next60.setDate(today.getDate() + 60);
+        const next90 = new Date();
+        next90.setDate(today.getDate() + 90);
+        
+        results.forEach((e) => {
+          if (e.status === "Active") {
+            activeCount++;
+          } else {
+            inactiveCount++;
+          }
+          
+          const hasPassportAlert = e.passport_expiry && new Date(e.passport_expiry) <= next90 && new Date(e.passport_expiry) >= today;
+          const hasWpAlert = e.wp_expiry && new Date(e.wp_expiry) <= next60 && new Date(e.wp_expiry) >= today;
+          const isIncomplete = !e.phone;
+          
+          if (hasPassportAlert || hasWpAlert || isIncomplete) {
+            alertsCount++;
+          }
+        });
+        
+        setMetrics({
+          total: totalCount,
+          active: status === "active" ? totalCount : (status === "inactive" ? 0 : activeCount),
+          inactive: status === "inactive" ? totalCount : (status === "active" ? 0 : inactiveCount),
+          alerts: alertsCount,
+        });
+      })
+      .catch((err) => console.error("Error calculating metrics:", err));
+    }
+  }, [division, status, search, designation, nationality, docType, expiryDays, joinedFrom, joinedTo, incomplete]);
+
+  useEffect(() => {
+    updateMetrics();
+  }, [updateMetrics]);
 
   // ── Parse URL parameters on mount ──────────────────────
   useEffect(() => {
@@ -126,7 +205,7 @@ function EmployeeList() {
         setLoading(false);
       })
       .catch((err) => {
-        console.log(err);
+        console.error("Error fetching employees:", err);
         setLoading(false);
       });
   }, [
@@ -170,7 +249,7 @@ function EmployeeList() {
       .then((res) => {
         setDivisions(res.data);
       })
-      .catch((err) => console.log(err));
+      .catch((err) => console.error("Error fetching divisions:", err));
   }, []);
 
   // ── Save selected division to localStorage ────────────────
@@ -185,10 +264,21 @@ function EmployeeList() {
     fetchEmployees();
   }, [fetchEmployees]);
 
-  const hasActiveFilters =
-    designation || nationality || docType || joinedFrom || joinedTo;
+  const hasActiveFilters = !!(
+    (division && division !== "all") ||
+    status ||
+    search ||
+    designation ||
+    nationality ||
+    docType ||
+    joinedFrom ||
+    joinedTo ||
+    incomplete
+  );
 
   const clearFilters = () => {
+    setSearch("");
+    setStatus("");
     setDesignation("");
     setNationality("");
     setDocType("");
@@ -197,6 +287,8 @@ function EmployeeList() {
     setTempExpiryDays("60");
     setJoinedFrom("");
     setJoinedTo("");
+    setIncomplete("");
+    setDivision("all");
     setCurrentPage(1);
   };
   
@@ -213,135 +305,200 @@ function EmployeeList() {
       <Sidebar />
       <main className="dashboard-main employee-page">
       {/* ── HEADER ────────────────────────────────────── */}
-      <div className="employee-header">
+      <div className="employee-header-block">
         <div className="header-left">
           <button className="back-button" onClick={() => navigate(-1)}>
             ← Back
           </button>
-          <h1>Employee List</h1>
-        </div>
-
-        <div className="filters">
-          {/* ── Primary Search ── */}
-          <div className="filter-group primary">
-            <div className="search-wrapper">
-              <span className="search-icon">
-                <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0118 0z" size={14} stroke="var(--grey-400)" />
-              </span>
-              <input
-                type="text"
-                placeholder="Search by ID, Name, WP, FIN or SSIC..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="search-input primary"
-              />
-            </div>
+          <div className="header-title-wrapper">
+            <h1>Employee List</h1>
+            <p className="header-subtitle">
+              Manage employee profiles, track contract expiries, and edit work divisions.
+            </p>
           </div>
-
-          {/* ── Secondary Filters ── */}
-          <div className="filter-group secondary">
-            <select
-              value={division}
-              onChange={(e) => setDivision(e.target.value)}
-            >
-              <option value="all">All Divisions</option>
-              {divisions.map((d) => (
-                <option key={d.id} value={d.name}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-
-            <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
-          {/* ── Tertiary Filters ── */}
-          <div className="filter-group tertiary">
-            <input
-              type="text"
-              placeholder="Designation..."
-              value={designation}
-              onChange={(e) => setDesignation(e.target.value)}
-              className="search-input"
-            />
-
-            <input
-              type="text"
-              placeholder="Nationality..."
-              value={nationality}
-              onChange={(e) => setNationality(e.target.value)}
-              className="search-input"
-            />
-
-            <div className="expiry-filter-group">
-              <select
-                value={tempDocType}
-                onChange={(e) => setTempDocType(e.target.value)}
-                className="expiry-type-select"
-              >
-                <option value="">All Documents</option>
-                <option value="wp">Work Permit</option>
-                <option value="passport">Passport</option>
-                <option value="ssic_gt">SSIC GT</option>
-                <option value="ssic_ht">SSIC HT</option>
-                <option value="security_bond">Security Bond</option>
-              </select>
-              <div className="expiry-days-wrapper">
-                <span>Expiring in next</span>
-                <input
-                  type="number"
-                  value={tempExpiryDays}
-                  onChange={(e) => setTempExpiryDays(e.target.value)}
-                  className="expiry-days-input"
-                  min="1"
-                />
-                <span>days</span>
-              </div>
-              <button 
-                className="apply-expiry-btn"
-                onClick={applyExpiryFilter}
-              >
-                Check
-              </button>
-            </div>
-          </div>
-
-          {/* ── Date Range ── */}
-          <div className="filter-group date-range">
-            <span className="date-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <Icon d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={14} stroke="var(--grey-500)" />
-              Joined Between
-            </span>
-            <input
-              type="date"
-              value={joinedFrom}
-              onChange={(e) => setJoinedFrom(e.target.value)}
-              title="Joined From"
-            />
-            <span className="date-sep">—</span>
-            <input
-              type="date"
-              value={joinedTo}
-              onChange={(e) => setJoinedTo(e.target.value)}
-              title="Joined To"
-            />
-          </div>
-
-          {hasActiveFilters && (
-            <button className="clear-filters-btn" onClick={clearFilters}>
-              ✕ Clear filters
-            </button>
-          )}
         </div>
       </div>
 
-      {/* ── Priority Alerts Deck ────────────────────────── */}
-      <section className="employee-alerts-deck">
-        <div className="alerts-grid-employee">
+      {/* ── SEARCH & PRIMARY ACTIONS ────────────────────── */}
+      <div className="search-actions-row">
+        <div className="search-wrapper-wide">
+          <span className="search-icon">
+            <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0118 0z" size={16} stroke="var(--grey-400)" />
+          </span>
+          <input
+            type="text"
+            placeholder="Search by ID, Name, WP, FIN or SSIC..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="search-input-wide"
+          />
+        </div>
+        <div className="primary-actions">
+          <button className="btn-primary-saas" onClick={() => navigate("/import")}>
+            <Icon d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" size={16} stroke="white" />
+            Import Employees
+          </button>
+        </div>
+      </div>
+
+      {/* ── FILTER BAR ─────────────────────────────────── */}
+      <div className="filter-bar-container">
+        <div className="quick-filters-row">
+          <div className="quick-filters-left">
+            <div className="filter-select-wrapper">
+              <span className="filter-select-label">Division</span>
+              <select
+                value={division}
+                onChange={(e) => {
+                  setDivision(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="saas-filter-select"
+              >
+                <option value="all">All Divisions</option>
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-select-wrapper">
+              <span className="filter-select-label">Status</span>
+              <select 
+                value={status} 
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="saas-filter-select"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+
+            <button 
+              className={`advanced-toggle-btn ${showAdvanced ? "active" : ""}`}
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <Icon d={showAdvanced ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"} size={14} stroke="var(--grey-600)" />
+              {showAdvanced ? "Hide Advanced Filters" : "Advanced Filters"}
+            </button>
+          </div>
+
+          <div className="quick-filters-right">
+            {hasActiveFilters && (
+              <button className="clear-filters-btn-saas" onClick={clearFilters}>
+                ✕ Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ── Collapsible Advanced Filters ── */}
+        {showAdvanced && (
+          <div className="advanced-filters-panel">
+            <div className="advanced-filters-grid">
+              
+              <div className="advanced-filter-item">
+                <label>Designation</label>
+                <input
+                  type="text"
+                  placeholder="Filter designation..."
+                  value={designation}
+                  onChange={(e) => {
+                    setDesignation(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="saas-filter-input"
+                />
+              </div>
+
+              <div className="advanced-filter-item">
+                <label>Nationality</label>
+                <input
+                  type="text"
+                  placeholder="Filter nationality..."
+                  value={nationality}
+                  onChange={(e) => {
+                    setNationality(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="saas-filter-input"
+                />
+              </div>
+
+              <div className="advanced-filter-item expiry-group">
+                <label>Document Expiry</label>
+                <div className="saas-expiry-filter-group">
+                  <select
+                    value={tempDocType}
+                    onChange={(e) => setTempDocType(e.target.value)}
+                    className="saas-expiry-select"
+                  >
+                    <option value="">All Documents</option>
+                    <option value="wp">Work Permit</option>
+                    <option value="passport">Passport</option>
+                    <option value="ssic_gt">SSIC GT</option>
+                    <option value="ssic_ht">SSIC HT</option>
+                    <option value="security_bond">Security Bond</option>
+                  </select>
+                  <div className="saas-expiry-days">
+                    <span>in</span>
+                    <input
+                      type="number"
+                      value={tempExpiryDays}
+                      onChange={(e) => setTempExpiryDays(e.target.value)}
+                      className="saas-expiry-input"
+                      min="1"
+                    />
+                    <span>days</span>
+                  </div>
+                  <button className="apply-expiry-btn-saas" onClick={applyExpiryFilter}>
+                    Apply
+                  </button>
+                </div>
+              </div>
+
+              <div className="advanced-filter-item date-range-group">
+                <label>Date Joined Range</label>
+                <div className="saas-date-range-group">
+                  <input
+                    type="date"
+                    value={joinedFrom}
+                    onChange={(e) => {
+                      setJoinedFrom(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    title="Joined From"
+                  />
+                  <span className="date-range-sep">—</span>
+                  <input
+                    type="date"
+                    value={joinedTo}
+                    onChange={(e) => {
+                      setJoinedTo(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    title="Joined To"
+                  />
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── KPI Metrics Deck ────────────────────────────── */}
+      <section className="summary-deck-section">
+        <div className="summary-deck-grid">
           
           {/* Card 1: Total Employees */}
           <div 
@@ -350,16 +507,18 @@ function EmployeeList() {
               setIncomplete("");
               setDocType("");
               setExpiryDays("60");
+              setTempDocType("");
+              setTempExpiryDays("60");
               setCurrentPage(1);
             }}
-            className={`alert-strip-card blue clickable ${!status && !incomplete && !docType ? "active-filter" : ""}`}
+            className={`saas-summary-card clickable ${!status && !incomplete && !docType ? "active-filter" : ""}`}
           >
-            <div className="alert-icon-circle">
-              <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={16} stroke="#3b82f6" />
+            <div className="saas-summary-content">
+              <span className="saas-summary-label">Total Employees</span>
+              <h3 className="saas-summary-value">{metrics.total}</h3>
             </div>
-            <div className="alert-strip-body">
-              <div className="alert-strip-title">{alertCounts.total_employees || 0} Total Employees</div>
-              <div className="alert-strip-subtitle">All active & inactive</div>
+            <div className="saas-summary-icon-circle blue">
+              <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={18} stroke="var(--theme-600)" />
             </div>
           </div>
 
@@ -370,16 +529,18 @@ function EmployeeList() {
               setIncomplete("");
               setDocType("");
               setExpiryDays("60");
+              setTempDocType("");
+              setTempExpiryDays("60");
               setCurrentPage(1);
             }}
-            className={`alert-strip-card green clickable ${status === "active" && !incomplete && !docType ? "active-filter" : ""}`}
+            className={`saas-summary-card clickable ${status === "active" && !incomplete && !docType ? "active-filter" : ""}`}
           >
-            <div className="alert-icon-circle">
-              <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" size={16} stroke="#10b981" />
+            <div className="saas-summary-content">
+              <span className="saas-summary-label">Active Employees</span>
+              <h3 className="saas-summary-value">{metrics.active}</h3>
             </div>
-            <div className="alert-strip-body">
-              <div className="alert-strip-title">{alertCounts.active_employees || 0} Active Employees</div>
-              <div className="alert-strip-subtitle">Current workforce</div>
+            <div className="saas-summary-icon-circle green">
+              <Icon d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" size={18} stroke="#10b981" />
             </div>
           </div>
 
@@ -390,96 +551,40 @@ function EmployeeList() {
               setIncomplete("");
               setDocType("");
               setExpiryDays("60");
+              setTempDocType("");
+              setTempExpiryDays("60");
               setCurrentPage(1);
             }}
-            className={`alert-strip-card red clickable ${status === "inactive" && !incomplete && !docType ? "active-filter" : ""}`}
+            className={`saas-summary-card clickable ${status === "inactive" && !incomplete && !docType ? "active-filter" : ""}`}
           >
-            <div className="alert-icon-circle">
-              <Icon d="M18.36 18.36A9 9 0 115.64 5.64m12.72 12.72A9 9 0 115.64 5.64" size={16} stroke="#ef4444" />
+            <div className="saas-summary-content">
+              <span className="saas-summary-label">Inactive Employees</span>
+              <h3 className="saas-summary-value">{metrics.inactive}</h3>
             </div>
-            <div className="alert-strip-body">
-              <div className="alert-strip-title">{alertCounts.inactive_employees || 0} Inactive Employees</div>
-              <div className="alert-strip-subtitle">Exited workforce</div>
+            <div className="saas-summary-icon-circle red">
+              <Icon d="M18.36 18.36A9 9 0 115.64 5.64m12.72 12.72A9 9 0 115.64 5.64" size={18} stroke="#ef4444" />
             </div>
           </div>
 
-          {/* Card 4: Incomplete Profiles */}
+          {/* Card 4: Critical Alerts */}
           <div 
             onClick={() => {
               setStatus("");
               setIncomplete("true");
               setDocType("");
-              setExpiryDays("");
-              setCurrentPage(1);
-            }}
-            className={`alert-strip-card danger clickable ${incomplete === "true" ? "active-filter" : ""}`}
-          >
-            <div className="alert-icon-circle">
-              <Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={16} stroke="#dc2626" />
-            </div>
-            <div className="alert-strip-body">
-              <div className="alert-strip-title">{alertCounts.incomplete_profiles || 0} Incomplete Profiles</div>
-              <div className="alert-strip-subtitle">Action required</div>
-            </div>
-          </div>
-
-          {/* Card 5: Passport Expiring */}
-          <div 
-            onClick={() => {
-              setStatus("");
-              setIncomplete("");
-              setDocType("passport");
-              setExpiryDays("90");
-              setCurrentPage(1);
-            }}
-            className={`alert-strip-card warning clickable ${docType === "passport" && expiryDays === "90" ? "active-filter" : ""}`}
-          >
-            <div className="alert-icon-circle">
-              <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" size={16} stroke="#d97706" />
-            </div>
-            <div className="alert-strip-body">
-              <div className="alert-strip-title">{alertCounts.passport_expiring || 0} Passports Expiring</div>
-              <div className="alert-strip-subtitle">Within 90 days</div>
-            </div>
-          </div>
-
-          {/* Card 6: Work Permit Expiring */}
-          <div 
-            onClick={() => {
-              setStatus("");
-              setIncomplete("");
-              setDocType("wp");
               setExpiryDays("60");
+              setTempDocType("");
+              setTempExpiryDays("60");
               setCurrentPage(1);
             }}
-            className={`alert-strip-card info clickable ${docType === "wp" && expiryDays === "60" ? "active-filter" : ""}`}
+            className={`saas-summary-card clickable ${incomplete === "true" ? "active-filter" : ""}`}
           >
-            <div className="alert-icon-circle">
-              <Icon d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" size={16} stroke="#2563eb" />
+            <div className="saas-summary-content">
+              <span className="saas-summary-label">Action Required Alerts</span>
+              <h3 className="saas-summary-value">{metrics.alerts}</h3>
             </div>
-            <div className="alert-strip-body">
-              <div className="alert-strip-title">{alertCounts.wp_expiring || 0} Work Permits Expiring</div>
-              <div className="alert-strip-subtitle">Within 60 days</div>
-            </div>
-          </div>
-
-          {/* Card 7: SSIC / ID Expiring */}
-          <div 
-            onClick={() => {
-              setStatus("");
-              setIncomplete("");
-              setDocType("ssic_gt");
-              setExpiryDays("60");
-              setCurrentPage(1);
-            }}
-            className={`alert-strip-card purple clickable ${docType === "ssic_gt" && expiryDays === "60" ? "active-filter" : ""}`}
-          >
-            <div className="alert-icon-circle">
-              <Icon d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" size={16} stroke="#7c3aed" />
-            </div>
-            <div className="alert-strip-body">
-              <div className="alert-strip-title">{alertCounts.ssic_gt_expiring || 0} SSIC / ID Expiring</div>
-              <div className="alert-strip-subtitle">Within 60 days</div>
+            <div className="saas-summary-icon-circle amber">
+              <Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={18} stroke="#d97706" />
             </div>
           </div>
 
@@ -509,7 +614,7 @@ function EmployeeList() {
           </thead>
           <tbody>
             {loading ? (
-              // Skeleton Loader
+              // Premium Skeleton Loader
               Array.from({ length: pageSize }, (_, i) => (
                 <tr key={i} className="skeleton-row">
                   <td>
@@ -530,22 +635,28 @@ function EmployeeList() {
                   <td>
                     <div className="skeleton skeleton-pill"></div>
                   </td>
+                  <td>
+                    <div className="skeleton skeleton-actions"></div>
+                  </td>
                 </tr>
               ))
             ) : employees.length === 0 ? (
               <tr>
                 <td colSpan={7}>
-                  <div className="empty-state">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                    </svg>
-                    <p>No employees found</p>
+                  <div className="empty-state-card-saas">
+                    <div className="empty-state-icon-saas">
+                      <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={32} stroke="var(--grey-400)" />
+                    </div>
+                    <h4>No employees match your filters.</h4>
+                    <p>Adjust your search queries, reset your active status and divisions, or upload a new registry file.</p>
+                    <div className="empty-state-actions">
+                      <button className="empty-state-btn-clear" onClick={clearFilters}>
+                        Clear Filters
+                      </button>
+                      <button className="empty-state-btn-import" onClick={() => navigate("/import")}>
+                        Import Employees
+                      </button>
+                    </div>
                   </div>
                 </td>
               </tr>

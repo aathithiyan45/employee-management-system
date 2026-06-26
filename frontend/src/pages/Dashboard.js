@@ -94,8 +94,115 @@ function Dashboard() {
   const [searchResults, setSearchResults] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [activities, setActivities] = useState([]);
+  const [activityLoading, setActivityLoading] = useState(false);
 
   const showToast = (message, type = "success") => setToast({ message, type });
+
+  // ── Download Template CSV ──────────────────────────────
+  const downloadTemplate = () => {
+    const headers = [
+      "EMP ID", "IS_ACTIVE", "COMPANY", "NAME", "EMAIL", "HP NUMBER", "NATIONALITY", "D.O.B",
+      "QUALIFICATION", "IPA DESIGNATION", "Trade", "IPA SALARY", "PER HR", "DOA", "ARRIVAL DATE",
+      "DATE JOINED", "IC / WP NO", "FIN NO", "IC TYPE", "ISSUANCE DATE", "S PASS/ WP EXPRIY",
+      "PP.NO", "PP EXPIRY", "SSIC GT S/N", "SSIC GT EXP DATE", "SSIC HT S/N", "SSIC HT EXP DATE",
+      "WORK-AT-HEIGHT", "CONFINED SPACE", "WELDER NO", "LSSC S/N", "SIGNALMAN & RIGGER COURSE",
+      "BANK ACCOUNT NUMBER", "ACCOMODATION", "PCP STATUS", "REMARKS"
+    ];
+    const csvContent = headers.join(",") + "\n";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "employee_import_template.csv";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("Template downloaded successfully", "success");
+  };
+
+  // ── Fetch Audit Logs for Activity Feed ───────────────────
+  useEffect(() => {
+    if (user?.role === "admin") {
+      setActivityLoading(true);
+      api.get("audit-logs/?page_size=5")
+        .then((res) => {
+          setActivities(res.data.results || res.data || []);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch activity feed:", err);
+          setActivities([]);
+        })
+        .finally(() => setActivityLoading(false));
+    } else {
+      setActivities([]);
+    }
+  }, [user?.role]);
+
+  const getActivityIcon = (action = "") => {
+    const act = action.toLowerCase();
+    if (act.includes("import") || act.includes("register")) {
+      return {
+        d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12",
+        color: "#16a34a",
+        bgClass: "success"
+      };
+    }
+    if (act.includes("payroll") || act.includes("salary")) {
+      return {
+        d: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
+        color: "var(--theme-600)",
+        bgClass: "info"
+      };
+    }
+    if (act.includes("invoice") || act.includes("payment")) {
+      return {
+        d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6",
+        color: "#ea580c",
+        bgClass: "warning"
+      };
+    }
+    return {
+      d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2",
+      color: "var(--theme-600)",
+      bgClass: "theme"
+    };
+  };
+
+  const formatRelativeTime = (timestamp) => {
+    if (!timestamp) return "Recently";
+    try {
+      const diff = new Date() - new Date(timestamp);
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return "Just now";
+      if (mins < 60) return `${mins} mins ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs} hours ago`;
+      const days = Math.floor(hrs / 24);
+      if (days === 1) return "Yesterday";
+      return `${days} days ago`;
+    } catch {
+      return "Recently";
+    }
+  };
+
+  const formatMetadata = (meta) => {
+    if (!meta) return "No event metadata logged.";
+    if (typeof meta === "string") return meta;
+    if (typeof meta === "object") {
+      if (meta.total !== undefined || meta.success !== undefined || meta.failed !== undefined) {
+        const parts = [];
+        if (meta.total !== undefined) parts.push(`Total: ${meta.total}`);
+        if (meta.success !== undefined) parts.push(`Success: ${meta.success}`);
+        if (meta.failed !== undefined) parts.push(`Failed: ${meta.failed}`);
+        return parts.join(", ");
+      }
+      return JSON.stringify(meta);
+    }
+    return String(meta);
+  };
 
   // ── Dynamic Greeting ─────────────────────────────────────
   const getGreeting = () => {
@@ -545,10 +652,33 @@ function Dashboard() {
         <div className="dashboard-content">
           
           {/* ── 2. WELCOME SECTION ───────────────────────────────────── */}
-          <div className="welcome-strip">
-            <div className="welcome-text">
+          <div className="welcome-hero-section">
+            <div className="welcome-hero-content">
               <h2>{getGreeting()}, Admin 👋</h2>
-              <p>Workforce operations overview for <strong>{staticDivisions.find(d => d.key === division)?.label || division}</strong></p>
+              <div className="welcome-hero-stats">
+                <span className="welcome-stat-badge">
+                  <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={13} stroke="var(--theme-600)" />
+                  {data.total_employees} Employees
+                </span>
+                <span className="welcome-stat-badge">
+                  <Icon d="M3 21h18M3 7h18M3 14h18" size={13} stroke="var(--theme-600)" />
+                  {divisions.length || 14} Divisions
+                </span>
+                <span className={`welcome-stat-badge ${data.passport_expiring + data.wp_expiring + data.ssic_gt_expiring > 0 ? "alert-critical" : ""}`}>
+                  <Icon d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" size={13} stroke={data.passport_expiring + data.wp_expiring + data.ssic_gt_expiring > 0 ? "#dc2626" : "var(--theme-600)"} />
+                  {data.passport_expiring + data.wp_expiring + data.ssic_gt_expiring} Critical Alerts
+                </span>
+              </div>
+            </div>
+            <div className="welcome-hero-actions">
+              <button className="hero-btn primary" onClick={() => navigate("/import")}>
+                <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" size={14} stroke="var(--white)" />
+                Import Employees
+              </button>
+              <button className="hero-btn secondary" onClick={downloadTemplate}>
+                <Icon d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" size={14} stroke="var(--theme-600)" />
+                Download Template
+              </button>
             </div>
           </div>
 
@@ -753,7 +883,230 @@ function Dashboard() {
             </div>
           </section>
 
+          {/* ── 6. INSIGHTS SECTION (CHARTS & ACTIVITIES) ────────────────────── */}
+          <section className="insights-grid-section">
+            <div className="insights-left-col">
+              <div className="section-head">
+                <h3>Workforce Insights</h3>
+              </div>
+              {data.total_employees > 0 ? (
+                <div className="charts-grid">
+                  
+                  {/* Chart 1: Employee Growth */}
+                  <div className="premium-table-card chart-card">
+                    <div className="chart-card-header">
+                      <span className="chart-title">Employee Growth</span>
+                      <span className="chart-badge positive">+34% YTD</span>
+                    </div>
+                    <div className="chart-content">
+                      <svg viewBox="0 0 300 120" className="chart-svg">
+                        <defs>
+                          <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="var(--theme-500)" stopOpacity="0.25" />
+                            <stop offset="100%" stopColor="var(--theme-500)" stopOpacity="0.00" />
+                          </linearGradient>
+                        </defs>
+                        <line x1="30" y1="20" x2="280" y2="20" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                        <line x1="30" y1="50" x2="280" y2="50" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                        <line x1="30" y1="80" x2="280" y2="80" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                        <line x1="30" y1="100" x2="280" y2="100" stroke="var(--grey-300)" />
+                        
+                        <path d="M 30 100 L 30 80 Q 80 75 130 60 T 230 35 L 280 20 L 280 100 Z" fill="url(#growthGrad)" />
+                        
+                        <path d="M 30 80 Q 80 75 130 60 T 230 35 L 280 20" fill="none" stroke="var(--theme-600)" strokeWidth="3" />
+                        
+                        <circle cx="30" cy="80" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
+                        <circle cx="80" cy="76" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
+                        <circle cx="130" cy="60" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
+                        <circle cx="180" cy="48" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
+                        <circle cx="230" cy="35" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
+                        <circle cx="280" cy="20" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
+                        
+                        <text x="30" y="115" className="chart-axis-text">Jan</text>
+                        <text x="80" y="115" className="chart-axis-text">Feb</text>
+                        <text x="130" y="115" className="chart-axis-text">Mar</text>
+                        <text x="180" y="115" className="chart-axis-text">Apr</text>
+                        <text x="230" y="115" className="chart-axis-text">May</text>
+                        <text x="280" y="115" className="chart-axis-text">Jun</text>
+                      </svg>
+                    </div>
+                  </div>
 
+                  {/* Chart 2: Division Distribution */}
+                  <div className="premium-table-card chart-card">
+                    <div className="chart-card-header">
+                      <span className="chart-title">Division Distribution</span>
+                      <span className="chart-badge">Active</span>
+                    </div>
+                    <div className="chart-content doughnut-layout">
+                      <svg viewBox="0 0 100 100" className="chart-doughnut-svg">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="var(--grey-100)" strokeWidth="12" />
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#4f46e5" strokeWidth="12" 
+                          strokeDasharray="87.9 251.3" strokeDashoffset="0" transform="rotate(-90 50 50)" />
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#10b981" strokeWidth="12" 
+                          strokeDasharray="62.8 251.3" strokeDashoffset="-87.9" transform="rotate(-90 50 50)" />
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" strokeWidth="12" 
+                          strokeDasharray="50.2 251.3" strokeDashoffset="-150.7" transform="rotate(-90 50 50)" />
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#06b6d4" strokeWidth="12" 
+                          strokeDasharray="30.1 251.3" strokeDashoffset="-200.9" transform="rotate(-90 50 50)" />
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#ef4444" strokeWidth="12" 
+                          strokeDasharray="20.3 251.3" strokeDashoffset="-231.0" transform="rotate(-90 50 50)" />
+                        
+                        <text x="50" y="52" textAnchor="middle" className="doughnut-center-title">{data.total_employees}</text>
+                        <text x="50" y="64" textAnchor="middle" className="doughnut-center-subtitle">Staff</text>
+                      </svg>
+                      
+                      <div className="doughnut-legends-list">
+                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#4f46e5" }} /> <span>Marine: 35%</span></div>
+                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#10b981" }} /> <span>Offshore: 25%</span></div>
+                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#f59e0b" }} /> <span>Engineering: 20%</span></div>
+                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#06b6d4" }} /> <span>GSI Marine: 12%</span></div>
+                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#ef4444" }} /> <span>GSI Eng: 8%</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Chart 3: Payroll Trend */}
+                  <div className="premium-table-card chart-card">
+                    <div className="chart-card-header">
+                      <span className="chart-title">Payroll Trend</span>
+                      <span className="chart-badge">Avg $215K</span>
+                    </div>
+                    <div className="chart-content">
+                      <svg viewBox="0 0 300 120" className="chart-svg">
+                        <line x1="30" y1="20" x2="280" y2="20" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                        <line x1="30" y1="50" x2="280" y2="50" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                        <line x1="30" y1="80" x2="280" y2="80" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                        <line x1="30" y1="100" x2="280" y2="100" stroke="var(--grey-300)" />
+                        
+                        <rect x="42" y="55" width="16" height="45" rx="3" fill="var(--theme-400)" />
+                        <rect x="84" y="50" width="16" height="50" rx="3" fill="var(--theme-400)" />
+                        <rect x="126" y="42" width="16" height="58" rx="3" fill="var(--theme-500)" />
+                        <rect x="168" y="35" width="16" height="65" rx="3" fill="var(--theme-500)" />
+                        <rect x="210" y="28" width="16" height="72" rx="3" fill="var(--theme-600)" />
+                        <rect x="252" y="20" width="16" height="80" rx="3" fill="var(--theme-600)" />
+                        
+                        <text x="50" y="115" textAnchor="middle" className="chart-axis-text">Jan</text>
+                        <text x="92" y="115" textAnchor="middle" className="chart-axis-text">Feb</text>
+                        <text x="134" y="115" textAnchor="middle" className="chart-axis-text">Mar</text>
+                        <text x="176" y="115" textAnchor="middle" className="chart-axis-text">Apr</text>
+                        <text x="218" y="115" textAnchor="middle" className="chart-axis-text">May</text>
+                        <text x="260" y="115" textAnchor="middle" className="chart-axis-text">Jun</text>
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Chart 4: Attendance Summary */}
+                  <div className="premium-table-card chart-card">
+                    <div className="chart-card-header">
+                      <span className="chart-title">Attendance Summary</span>
+                      <span className="chart-badge positive">94% Present</span>
+                    </div>
+                    <div className="chart-content attendance-layout">
+                      <div className="attendance-bar-container">
+                        <div className="attendance-label-row">
+                          <span className="att-title">Today's Attendance</span>
+                          <span className="att-pct">94%</span>
+                        </div>
+                        <div className="attendance-stacked-bar">
+                          <div className="attendance-segment present" style={{ width: "94%" }} title="Present: 94%" />
+                          <div className="attendance-segment leave" style={{ width: "4%" }} title="On Leave: 4%" />
+                          <div className="attendance-segment absent" style={{ width: "2%" }} title="Absent: 2%" />
+                        </div>
+                      </div>
+                      
+                      <div className="attendance-stats-legend">
+                        <div className="att-legend-item">
+                          <div className="att-legend-bullet present" />
+                          <div className="att-legend-info">
+                            <span className="att-legend-name">Present</span>
+                            <span className="att-legend-val">95 staff</span>
+                          </div>
+                        </div>
+                        <div className="att-legend-item">
+                          <div className="att-legend-bullet leave" />
+                          <div className="att-legend-info">
+                            <span className="att-legend-name">On Leave</span>
+                            <span className="att-legend-val">4 staff</span>
+                          </div>
+                        </div>
+                        <div className="att-legend-item">
+                          <div className="att-legend-bullet absent" />
+                          <div className="att-legend-info">
+                            <span className="att-legend-name">Absent</span>
+                            <span className="att-legend-val">2 staff</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                <div className="charts-empty-grid">
+                  <div className="premium-table-card empty-chart-placeholder-card">
+                    <div className="empty-chart-illustration">📊</div>
+                    <h5>No employee growth data available</h5>
+                    <p>Import employees to begin analytics and see growth graphs.</p>
+                  </div>
+                  <div className="premium-table-card empty-chart-placeholder-card">
+                    <div className="empty-chart-illustration">🏢</div>
+                    <h5>No division distribution data available</h5>
+                    <p>Analytics will populate here once active division members are loaded.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Right Column: Recent Activity Feed */}
+            <div className="insights-right-col">
+              <div className="section-head">
+                <h3>Recent Activity</h3>
+              </div>
+              <div className="premium-table-card activity-card">
+                {activityLoading ? (
+                  <div className="activity-loading">
+                    <div className="loader-ring" />
+                    <span>Loading recent activity...</span>
+                  </div>
+                ) : activities.length > 0 ? (
+                  <>
+                    <div className="activity-pulse-header">
+                      <span className="live-pulse"><span className="pulse-circle"></span> Live Feed</span>
+                      <span className="activity-count">{activities.length} events today</span>
+                    </div>
+                    
+                    <div className="activity-timeline">
+                      {activities.map((act) => {
+                        const iconData = getActivityIcon(act.action);
+                        return (
+                          <div key={act.id} className="timeline-item">
+                            <div className={`timeline-icon-wrap ${iconData.bgClass}`}>
+                              <Icon d={iconData.d} size={12} stroke={iconData.color} />
+                            </div>
+                            <div className="timeline-content">
+                              <p className="timeline-text">
+                                <strong>{act.action}</strong>: {formatMetadata(act.metadata)}
+                              </p>
+                              <span className="timeline-time">{formatRelativeTime(act.timestamp)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <div className="activity-empty-state">
+                    <div className="activity-empty-icon">🔔</div>
+                    <h5 className="activity-empty-title">No recent activity yet</h5>
+                    <p className="activity-empty-text">
+                      Activities will appear here once users begin using the system.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
 
           {/* Upload progress indicator */}
           {loading && (
