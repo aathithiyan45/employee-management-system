@@ -64,6 +64,18 @@ const toTitleCase = (str) => {
   return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 };
 
+const emptyStyle = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  height: "120px",
+  color: "var(--grey-500)",
+  fontSize: "0.875rem",
+  textAlign: "center",
+  padding: "1rem"
+};
+
 
 
 function Dashboard() {
@@ -72,19 +84,40 @@ function Dashboard() {
 
   // ── States ───────────────────────────────────────────────
   const [data, setData] = useState({
-    total_employees:     0,
-    active_employees:    0,
-    inactive_employees:  0,
-    wp_expiring:         0,
-    passport_expiring:   0,
-    ssic_gt_expiring:    0,
-    incomplete_profiles: 0,
+    summary: {
+      total_employees:     0,
+      active_employees:    0,
+      inactive_employees:  0,
+      wp_expiring:         0,
+      passport_expiring:   0,
+      ssic_gt_expiring:    0,
+      incomplete_profiles: 0,
+      total_documents:     0,
+    },
+    charts: {
+      employee_growth: [],
+      division_distribution: [],
+      payroll_trend: {
+        trend: [],
+        average_payroll: 0,
+        comparison: 0
+      },
+      attendance_summary: {
+        present_count: 0,
+        absent_count: 0,
+        leave_count: 0,
+        present_percentage: 0.0,
+        absent_percentage: 0.0,
+        leave_percentage: 0.0
+      }
+    },
+    recent_activity: [],
+    division_cards: []
   });
 
   const [division, setDivision] = useState(
     localStorage.getItem("selectedDivision") || "all"
   );
-  const [divisions, setDivisions] = useState([]);
   const [loading, setLoading] = useState(false);
   // eslint-disable-next-line no-unused-vars
   const [exportLoading, setExportLoading] = useState(false);
@@ -94,8 +127,6 @@ function Dashboard() {
   const [searchResults, setSearchResults] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [activities, setActivities] = useState([]);
-  const [activityLoading, setActivityLoading] = useState(false);
 
   const showToast = (message, type = "success") => setToast({ message, type });
 
@@ -123,41 +154,22 @@ function Dashboard() {
     showToast("Template downloaded successfully", "success");
   };
 
-  // ── Fetch Audit Logs for Activity Feed ───────────────────
-  useEffect(() => {
-    if (user?.role === "admin") {
-      setActivityLoading(true);
-      api.get("audit-logs/?page_size=5")
-        .then((res) => {
-          setActivities(res.data.results || res.data || []);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch activity feed:", err);
-          setActivities([]);
-        })
-        .finally(() => setActivityLoading(false));
-    } else {
-      setActivities([]);
-    }
-  }, [user?.role]);
-
-  const getActivityIcon = (action = "") => {
-    const act = action.toLowerCase();
-    if (act.includes("import") || act.includes("register")) {
+  const getActivityIcon = (iconName = "") => {
+    if (iconName === "import" || iconName === "success") {
       return {
         d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12",
         color: "#16a34a",
         bgClass: "success"
       };
     }
-    if (act.includes("payroll") || act.includes("salary")) {
+    if (iconName === "payroll" || iconName === "info") {
       return {
         d: "M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6",
         color: "var(--theme-600)",
         bgClass: "info"
       };
     }
-    if (act.includes("invoice") || act.includes("payment")) {
+    if (iconName === "invoice" || iconName === "warning") {
       return {
         d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6",
         color: "#ea580c",
@@ -188,22 +200,6 @@ function Dashboard() {
     }
   };
 
-  const formatMetadata = (meta) => {
-    if (!meta) return "No event metadata logged.";
-    if (typeof meta === "string") return meta;
-    if (typeof meta === "object") {
-      if (meta.total !== undefined || meta.success !== undefined || meta.failed !== undefined) {
-        const parts = [];
-        if (meta.total !== undefined) parts.push(`Total: ${meta.total}`);
-        if (meta.success !== undefined) parts.push(`Success: ${meta.success}`);
-        if (meta.failed !== undefined) parts.push(`Failed: ${meta.failed}`);
-        return parts.join(", ");
-      }
-      return JSON.stringify(meta);
-    }
-    return String(meta);
-  };
-
   // ── Dynamic Greeting ─────────────────────────────────────
   const getGreeting = () => {
     const hr = new Date().getHours();
@@ -217,13 +213,6 @@ function Dashboard() {
     const u = JSON.parse(localStorage.getItem("user"));
     if (!u) navigate("/");
   }, [navigate]);
-
-  // ── Fetch divisions ───────────────────────────────────────
-  useEffect(() => {
-    api.get("divisions/")
-      .then((res) => setDivisions(res.data))
-      .catch((err) => console.error("Divisions fetch error:", err));
-  }, []);
 
   // ── Persist division selection ────────────────────────────
   useEffect(() => {
@@ -298,7 +287,7 @@ function Dashboard() {
       });
 
       // Filter matched divisions
-      const matchedDivs = staticDivisions.filter(d => 
+      const matchedDivs = (data?.division_cards || []).filter(d => 
         d.key !== "all" && d.label.toLowerCase().includes(val.toLowerCase())
       );
 
@@ -435,22 +424,67 @@ function Dashboard() {
     navigate(`/employees?${params.toString()}`);
   };
 
-  // Helper: Retrieve division-specific employee count dynamically
-  const getDivisionCount = (divKey) => {
-    if (divKey === "all") return data.total_employees;
-    const found = divisions.find(d => d.name === divKey);
-    return found ? found.emp_count : 0;
-  };
+  // ── Chart coordinates & paths calculations ──────────────────
+  const growth = data?.charts?.employee_growth || [];
+  const points = [];
+  let linePath = "";
+  let fillPath = "";
+  let latestMoM = 0;
+  let growthBadgeText = "";
+  
+  if (growth.length > 0) {
+    const xStart = 30;
+    const xEnd = 280;
+    const xStep = growth.length > 1 ? (xEnd - xStart) / (growth.length - 1) : 0;
+    const yBottom = 100;
+    const yTop = 20;
+    const yHeight = yBottom - yTop;
+    const cumulatives = growth.map(g => g.cumulative);
+    const minVal = Math.min(...cumulatives, 0);
+    const maxVal = Math.max(...cumulatives, 1);
+    const range = maxVal - minVal;
+    
+    growth.forEach((g, idx) => {
+      const x = xStart + idx * xStep;
+      const y = yBottom - ((g.cumulative - minVal) / range) * yHeight;
+      points.push({ x, y, cumulative: g.cumulative, month: g.month });
+    });
+    
+    linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+    fillPath = `${linePath} L ${points[points.length-1].x} 100 L ${points[0].x} 100 Z`;
+    
+    latestMoM = growth[growth.length - 1].growth_percentage;
+    growthBadgeText = latestMoM >= 0 ? `+${latestMoM}% MoM` : `${latestMoM}% MoM`;
+  }
 
-  // Static list of premium divisions as requested
-  const staticDivisions = [
-    { key: "all",           label: "All Divisions",    color: "#4f46e5", bgClass: "all" },
-    { key: "PDS MARINE",    label: "PDS Marine",       color: "#10b981", bgClass: "pds-marine" },
-    { key: "PDS OFFSHORE",  label: "PDS Offshore",     color: "#f59e0b", bgClass: "pds-offshore" },
-    { key: "PDS ENGG",      label: "PDS Engineering",  color: "#8b5cf6", bgClass: "pds-eng" },
-    { key: "GSI MARINE",    label: "GSI Marine",       color: "#06b6d4", bgClass: "gsi-marine" },
-    { key: "GSI ENGG",      label: "GSI Engineering",  color: "#ef4444", bgClass: "gsi-eng" },
-  ];
+  const distribution = data?.charts?.division_distribution || [];
+  const colors = ["#4f46e5", "#10b981", "#f59e0b", "#06b6d4", "#ef4444", "#8b5cf6", "#ec4899", "#6b7280"];
+
+  const payroll = data?.charts?.payroll_trend || {};
+  const trend = payroll.trend || [];
+  const averagePayroll = payroll.average_payroll || 0;
+  
+  let payrollPoints = [];
+  if (trend.length > 0) {
+    const values = trend.map(t => t.total_payroll);
+    const maxVal = Math.max(...values, 1);
+    
+    trend.forEach((t, idx) => {
+      const height = (t.total_payroll / maxVal) * 80;
+      const y = 100 - height;
+      const x = 42 + idx * 40;
+      payrollPoints.push({ x, y, height, total_payroll: t.total_payroll, month: t.month });
+    });
+  }
+  const payrollBadgeText = `Avg $${(averagePayroll / 1000).toFixed(0)}K`;
+
+  const att = data?.charts?.attendance_summary || {};
+  const presentCount = att.present_count || 0;
+  const absentCount = att.absent_count || 0;
+  const leaveCount = att.leave_count || 0;
+  const presentPct = att.present_percentage || 0;
+  const absentPct = att.absent_percentage || 0;
+  const leavePct = att.leave_percentage || 0;
 
   // Helper for profile letters
   const getInitials = (name) => {
@@ -572,7 +606,7 @@ function Dashboard() {
                 onChange={(e) => setDivision(e.target.value)}
                 className="topbar-division-select"
               >
-                {staticDivisions.map((d) => (
+                {(data?.division_cards || []).map((d) => (
                   <option key={d.key} value={d.key}>
                     {d.label}
                   </option>
@@ -583,9 +617,9 @@ function Dashboard() {
             
             {(() => {
               const alertsList = [
-                { text: `${data.passport_expiring || 5} passports expiring in 90 days`, type: 'passport', link: '/employees?expiry_alert=passport&days=90' },
-                { text: `${data.wp_expiring || 3} work permits expiring in 60 days`, type: 'wp', link: '/employees?expiry_alert=wp&days=60' },
-                { text: `${data.incomplete_profiles || 310} incomplete profiles`, type: 'incomplete', link: '/employees?incomplete=true' },
+                { text: `${data?.summary?.passport_expiring || 0} passports expiring in 90 days`, type: 'passport', link: '/employees?expiry_alert=passport&days=90' },
+                { text: `${data?.summary?.wp_expiring || 0} work permits expiring in 60 days`, type: 'wp', link: '/employees?expiry_alert=wp&days=60' },
+                { text: `${data?.summary?.incomplete_profiles || 0} incomplete profiles`, type: 'incomplete', link: '/employees?incomplete=true' },
                 { text: "Payroll processing pending", type: 'payroll', link: '/payroll' },
                 { text: "2 failed document uploads", type: 'upload', link: '/employees' }
               ];
@@ -662,11 +696,11 @@ function Dashboard() {
                 </span>
                 <span className="welcome-stat-badge">
                   <Icon d="M3 21h18M3 7h18M3 14h18" size={13} stroke="var(--theme-600)" />
-                  {divisions.length || 14} Divisions
+                  {data?.division_cards ? (data.division_cards.length - 1) : 0} Divisions
                 </span>
-                <span className={`welcome-stat-badge ${data.passport_expiring + data.wp_expiring + data.ssic_gt_expiring > 0 ? "alert-critical" : ""}`}>
-                  <Icon d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" size={13} stroke={data.passport_expiring + data.wp_expiring + data.ssic_gt_expiring > 0 ? "#dc2626" : "var(--theme-600)"} />
-                  {data.passport_expiring + data.wp_expiring + data.ssic_gt_expiring} Critical Alerts
+                <span className={`welcome-stat-badge ${((data?.summary?.passport_expiring || 0) + (data?.summary?.wp_expiring || 0) + (data?.summary?.ssic_gt_expiring || 0)) > 0 ? "alert-critical" : ""}`}>
+                  <Icon d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" size={13} stroke={((data?.summary?.passport_expiring || 0) + (data?.summary?.wp_expiring || 0) + (data?.summary?.ssic_gt_expiring || 0)) > 0 ? "#dc2626" : "var(--theme-600)"} />
+                  {((data?.summary?.passport_expiring || 0) + (data?.summary?.wp_expiring || 0) + (data?.summary?.ssic_gt_expiring || 0))} Critical Alerts
                 </span>
               </div>
             </div>
@@ -689,9 +723,8 @@ function Dashboard() {
               <button className="section-text-link" onClick={() => navigate("/employees")}>View all divisions &rarr;</button>
             </div>
             <div className="divisions-horizontal-scroll">
-              {staticDivisions.map((divCard) => {
+              {(data?.division_cards || []).map((divCard) => {
                 const isActive = division === divCard.key;
-                const count = getDivisionCount(divCard.key);
                 return (
                   <div
                     key={divCard.key}
@@ -702,7 +735,7 @@ function Dashboard() {
                       <div className="div-icon-wrapper" style={{ backgroundColor: `${divCard.color}15`, color: divCard.color }}>
                         <Icon d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" size={16} />
                       </div>
-                      <span className="div-emp-badge">{count} Employees</span>
+                      <span className="div-emp-badge">{divCard.count} Employees</span>
                     </div>
                     <h4 className="div-card-title">{divCard.label}</h4>
                   </div>
@@ -723,8 +756,8 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">Total Employees</span>
-                    <h3 className="stat-card-value">{data.total_employees}</h3>
-                    <span className="stat-sub-detail text-blue">&uarr; 12 from last month</span>
+                    <h3 className="stat-card-value">{data?.summary?.total_employees || 0}</h3>
+                    <span className="stat-sub-detail text-blue">Direct DB query</span>
                   </div>
                 </div>
 
@@ -734,9 +767,9 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">Active Employees</span>
-                    <h3 className="stat-card-value">{data.active_employees}</h3>
+                    <h3 className="stat-card-value">{data?.summary?.active_employees || 0}</h3>
                     <span className="stat-sub-detail text-green">
-                      {data.total_employees > 0 ? ((data.active_employees / data.total_employees) * 100).toFixed(1) : 0}% of total
+                      {data?.summary?.total_employees > 0 ? ((data.summary.active_employees / data.summary.total_employees) * 100).toFixed(1) : 0}% of total
                     </span>
                   </div>
                 </div>
@@ -747,9 +780,9 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">Inactive Employees</span>
-                    <h3 className="stat-card-value">{data.inactive_employees}</h3>
+                    <h3 className="stat-card-value">{data?.summary?.inactive_employees || 0}</h3>
                     <span className="stat-sub-detail text-red">
-                      {data.total_employees > 0 ? ((data.inactive_employees / data.total_employees) * 100).toFixed(1) : 0}% of total
+                      {data?.summary?.total_employees > 0 ? ((data.summary.inactive_employees / data.summary.total_employees) * 100).toFixed(1) : 0}% of total
                     </span>
                   </div>
                 </div>
@@ -760,9 +793,9 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">Incomplete Profiles</span>
-                    <h3 className="stat-card-value">{data.incomplete_profiles}</h3>
+                    <h3 className="stat-card-value">{data?.summary?.incomplete_profiles || 0}</h3>
                     <span className="stat-sub-detail text-orange">
-                      {data.total_employees > 0 ? ((data.incomplete_profiles / data.total_employees) * 100).toFixed(1) : 0}% action needed
+                      {data?.summary?.total_employees > 0 ? ((data.summary.incomplete_profiles / data.summary.total_employees) * 100).toFixed(1) : 0}% action needed
                     </span>
                   </div>
                 </div>
@@ -773,7 +806,7 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">Passport Expiring</span>
-                    <h3 className="stat-card-value">{data.passport_expiring}</h3>
+                    <h3 className="stat-card-value">{data?.summary?.passport_expiring || 0}</h3>
                     <span className="stat-sub-detail text-sky">Within 90 days</span>
                   </div>
                 </div>
@@ -784,7 +817,7 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">Work Permit Expiring</span>
-                    <h3 className="stat-card-value">{data.wp_expiring}</h3>
+                    <h3 className="stat-card-value">{data?.summary?.wp_expiring || 0}</h3>
                     <span className="stat-sub-detail text-warning">Within 60 days</span>
                   </div>
                 </div>
@@ -795,7 +828,7 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">SSIC / ID Expiring</span>
-                    <h3 className="stat-card-value">{data.ssic_gt_expiring}</h3>
+                    <h3 className="stat-card-value">{data?.summary?.ssic_gt_expiring || 0}</h3>
                     <span className="stat-sub-detail text-violet">Within 60 days</span>
                   </div>
                 </div>
@@ -806,10 +839,8 @@ function Dashboard() {
                   </div>
                   <div className="stat-info">
                     <span className="stat-card-label">Total Documents</span>
-                    <h3 className="stat-card-value">
-                      {data.wp_expiring + data.passport_expiring + data.ssic_gt_expiring}
-                    </h3>
-                    <span className="stat-sub-detail text-grey">Tracked expiries</span>
+                    <h3 className="stat-card-value">{data?.summary?.total_documents || 0}</h3>
+                    <span className="stat-sub-detail text-grey">Tracked in database</span>
                   </div>
                 </div>
               </>
@@ -827,7 +858,7 @@ function Dashboard() {
                   <Icon d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={18} stroke="#dc2626" />
                 </div>
                 <div className="alert-strip-body">
-                  <div className="alert-strip-title">{data.incomplete_profiles} Incomplete Profiles</div>
+                  <div className="alert-strip-title">{data?.summary?.incomplete_profiles || 0} Incomplete Profiles</div>
                   <div className="alert-strip-subtitle">Action required</div>
                 </div>
                 <div className="alert-strip-arrow">
@@ -840,7 +871,7 @@ function Dashboard() {
                   <Icon d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" size={18} stroke="#d97706" />
                 </div>
                 <div className="alert-strip-body">
-                  <div className="alert-strip-title">{data.passport_expiring} Passports Expiring</div>
+                  <div className="alert-strip-title">{data?.summary?.passport_expiring || 0} Passports Expiring</div>
                   <div className="alert-strip-subtitle">Within 90 days</div>
                 </div>
                 <div className="alert-strip-arrow">
@@ -853,7 +884,7 @@ function Dashboard() {
                   <Icon d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" size={18} stroke="#2563eb" />
                 </div>
                 <div className="alert-strip-body">
-                  <div className="alert-strip-title">{data.wp_expiring} Work Permits Expiring</div>
+                  <div className="alert-strip-title">{data?.summary?.wp_expiring || 0} Work Permits Expiring</div>
                   <div className="alert-strip-subtitle">Within 60 days</div>
                 </div>
                 <div className="alert-strip-arrow">
@@ -866,7 +897,7 @@ function Dashboard() {
                   <Icon d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" size={18} stroke="#7c3aed" />
                 </div>
                 <div className="alert-strip-body">
-                  <div className="alert-strip-title">{data.ssic_gt_expiring} SSIC / ID Expiring</div>
+                  <div className="alert-strip-title">{data?.summary?.ssic_gt_expiring || 0} SSIC / ID Expiring</div>
                   <div className="alert-strip-subtitle">Within 60 days</div>
                 </div>
                 <div className="alert-strip-arrow">
@@ -889,46 +920,57 @@ function Dashboard() {
               <div className="section-head">
                 <h3>Workforce Insights</h3>
               </div>
-              {data.total_employees > 0 ? (
+              
+              {loading ? (
+                <div className="charts-grid">
+                  <SkeletonLoader key="c1" type="card" />
+                  <SkeletonLoader key="c2" type="card" />
+                  <SkeletonLoader key="c3" type="card" />
+                  <SkeletonLoader key="c4" type="card" />
+                </div>
+              ) : (
                 <div className="charts-grid">
                   
                   {/* Chart 1: Employee Growth */}
                   <div className="premium-table-card chart-card">
                     <div className="chart-card-header">
                       <span className="chart-title">Employee Growth</span>
-                      <span className="chart-badge positive">+34% YTD</span>
+                      {growth.length > 0 && (
+                        <span className={`chart-badge ${latestMoM >= 0 ? "positive" : "negative"}`}>
+                          {growthBadgeText}
+                        </span>
+                      )}
                     </div>
                     <div className="chart-content">
-                      <svg viewBox="0 0 300 120" className="chart-svg">
-                        <defs>
-                          <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="var(--theme-500)" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="var(--theme-500)" stopOpacity="0.00" />
-                          </linearGradient>
-                        </defs>
-                        <line x1="30" y1="20" x2="280" y2="20" stroke="var(--grey-200)" strokeDasharray="3,3" />
-                        <line x1="30" y1="50" x2="280" y2="50" stroke="var(--grey-200)" strokeDasharray="3,3" />
-                        <line x1="30" y1="80" x2="280" y2="80" stroke="var(--grey-200)" strokeDasharray="3,3" />
-                        <line x1="30" y1="100" x2="280" y2="100" stroke="var(--grey-300)" />
-                        
-                        <path d="M 30 100 L 30 80 Q 80 75 130 60 T 230 35 L 280 20 L 280 100 Z" fill="url(#growthGrad)" />
-                        
-                        <path d="M 30 80 Q 80 75 130 60 T 230 35 L 280 20" fill="none" stroke="var(--theme-600)" strokeWidth="3" />
-                        
-                        <circle cx="30" cy="80" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
-                        <circle cx="80" cy="76" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
-                        <circle cx="130" cy="60" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
-                        <circle cx="180" cy="48" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
-                        <circle cx="230" cy="35" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
-                        <circle cx="280" cy="20" r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
-                        
-                        <text x="30" y="115" className="chart-axis-text">Jan</text>
-                        <text x="80" y="115" className="chart-axis-text">Feb</text>
-                        <text x="130" y="115" className="chart-axis-text">Mar</text>
-                        <text x="180" y="115" className="chart-axis-text">Apr</text>
-                        <text x="230" y="115" className="chart-axis-text">May</text>
-                        <text x="280" y="115" className="chart-axis-text">Jun</text>
-                      </svg>
+                      {growth.length > 0 ? (
+                        <svg viewBox="0 0 300 120" className="chart-svg">
+                          <defs>
+                            <linearGradient id="growthGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--theme-500)" stopOpacity="0.25" />
+                              <stop offset="100%" stopColor="var(--theme-500)" stopOpacity="0.00" />
+                            </linearGradient>
+                          </defs>
+                          <line x1="30" y1="20" x2="280" y2="20" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                          <line x1="30" y1="50" x2="280" y2="50" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                          <line x1="30" y1="80" x2="280" y2="80" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                          <line x1="30" y1="100" x2="280" y2="100" stroke="var(--grey-300)" />
+                          
+                          {fillPath && <path d={fillPath} fill="url(#growthGrad)" />}
+                          {linePath && <path d={linePath} fill="none" stroke="var(--theme-600)" strokeWidth="3" />}
+                          
+                          {points.map((p, idx) => (
+                            <circle key={idx} cx={p.x} cy={p.y} r="4" fill="var(--white)" stroke="var(--theme-600)" strokeWidth="2" />
+                          ))}
+                          
+                          {points.map((p, idx) => (
+                            <text key={idx} x={p.x} y="115" textAnchor="middle" className="chart-axis-text">
+                              {p.month.split(' ')[0]}
+                            </text>
+                          ))}
+                        </svg>
+                      ) : (
+                        <div style={emptyStyle}>No employee records available.</div>
+                      )}
                     </div>
                   </div>
 
@@ -938,61 +980,97 @@ function Dashboard() {
                       <span className="chart-title">Division Distribution</span>
                       <span className="chart-badge">Active</span>
                     </div>
-                    <div className="chart-content doughnut-layout">
-                      <svg viewBox="0 0 100 100" className="chart-doughnut-svg">
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="var(--grey-100)" strokeWidth="12" />
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="#4f46e5" strokeWidth="12" 
-                          strokeDasharray="87.9 251.3" strokeDashoffset="0" transform="rotate(-90 50 50)" />
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="#10b981" strokeWidth="12" 
-                          strokeDasharray="62.8 251.3" strokeDashoffset="-87.9" transform="rotate(-90 50 50)" />
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" strokeWidth="12" 
-                          strokeDasharray="50.2 251.3" strokeDashoffset="-150.7" transform="rotate(-90 50 50)" />
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="#06b6d4" strokeWidth="12" 
-                          strokeDasharray="30.1 251.3" strokeDashoffset="-200.9" transform="rotate(-90 50 50)" />
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="#ef4444" strokeWidth="12" 
-                          strokeDasharray="20.3 251.3" strokeDashoffset="-231.0" transform="rotate(-90 50 50)" />
+                    {distribution.length > 0 ? (
+                      <div className="chart-content doughnut-layout">
+                        <svg viewBox="0 0 100 100" className="chart-doughnut-svg">
+                          <circle cx="50" cy="50" r="40" fill="none" stroke="var(--grey-100)" strokeWidth="12" />
+                          {(() => {
+                            let accum = 0;
+                            return distribution.map((d, idx) => {
+                              const fraction = d.percentage / 100;
+                              const strokeDasharray = `${(fraction * 251.3).toFixed(1)} 251.3`;
+                              const strokeDashoffset = -(accum * 251.3).toFixed(1);
+                              accum += fraction;
+                              const color = colors[idx % colors.length];
+                              return (
+                                <circle
+                                  key={idx}
+                                  cx="50"
+                                  cy="50"
+                                  r="40"
+                                  fill="none"
+                                  stroke={color}
+                                  strokeWidth="12"
+                                  strokeDasharray={strokeDasharray}
+                                  strokeDashoffset={strokeDashoffset}
+                                  transform="rotate(-90 50 50)"
+                                />
+                              );
+                            });
+                          })()}
+                          
+                          <text x="50" y="52" textAnchor="middle" className="doughnut-center-title">
+                            {data?.summary?.total_employees || 0}
+                          </text>
+                          <text x="50" y="64" textAnchor="middle" className="doughnut-center-subtitle">Staff</text>
+                        </svg>
                         
-                        <text x="50" y="52" textAnchor="middle" className="doughnut-center-title">{data.total_employees}</text>
-                        <text x="50" y="64" textAnchor="middle" className="doughnut-center-subtitle">Staff</text>
-                      </svg>
-                      
-                      <div className="doughnut-legends-list">
-                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#4f46e5" }} /> <span>Marine: 35%</span></div>
-                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#10b981" }} /> <span>Offshore: 25%</span></div>
-                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#f59e0b" }} /> <span>Engineering: 20%</span></div>
-                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#06b6d4" }} /> <span>GSI Marine: 12%</span></div>
-                        <div className="legend-item"><span className="legend-dot" style={{ backgroundColor: "#ef4444" }} /> <span>GSI Eng: 8%</span></div>
+                        <div className="doughnut-legends-list">
+                          {distribution.map((d, idx) => {
+                            const color = colors[idx % colors.length];
+                            return (
+                              <div key={idx} className="legend-item">
+                                <span className="legend-dot" style={{ backgroundColor: color }} />
+                                <span>{d.division}: {d.percentage}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="chart-content">
+                        <div style={emptyStyle}>No division data available.</div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Chart 3: Payroll Trend */}
                   <div className="premium-table-card chart-card">
                     <div className="chart-card-header">
                       <span className="chart-title">Payroll Trend</span>
-                      <span className="chart-badge">Avg $215K</span>
+                      {trend.length > 0 && (
+                        <span className="chart-badge">{payrollBadgeText}</span>
+                      )}
                     </div>
                     <div className="chart-content">
-                      <svg viewBox="0 0 300 120" className="chart-svg">
-                        <line x1="30" y1="20" x2="280" y2="20" stroke="var(--grey-200)" strokeDasharray="3,3" />
-                        <line x1="30" y1="50" x2="280" y2="50" stroke="var(--grey-200)" strokeDasharray="3,3" />
-                        <line x1="30" y1="80" x2="280" y2="80" stroke="var(--grey-200)" strokeDasharray="3,3" />
-                        <line x1="30" y1="100" x2="280" y2="100" stroke="var(--grey-300)" />
-                        
-                        <rect x="42" y="55" width="16" height="45" rx="3" fill="var(--theme-400)" />
-                        <rect x="84" y="50" width="16" height="50" rx="3" fill="var(--theme-400)" />
-                        <rect x="126" y="42" width="16" height="58" rx="3" fill="var(--theme-500)" />
-                        <rect x="168" y="35" width="16" height="65" rx="3" fill="var(--theme-500)" />
-                        <rect x="210" y="28" width="16" height="72" rx="3" fill="var(--theme-600)" />
-                        <rect x="252" y="20" width="16" height="80" rx="3" fill="var(--theme-600)" />
-                        
-                        <text x="50" y="115" textAnchor="middle" className="chart-axis-text">Jan</text>
-                        <text x="92" y="115" textAnchor="middle" className="chart-axis-text">Feb</text>
-                        <text x="134" y="115" textAnchor="middle" className="chart-axis-text">Mar</text>
-                        <text x="176" y="115" textAnchor="middle" className="chart-axis-text">Apr</text>
-                        <text x="218" y="115" textAnchor="middle" className="chart-axis-text">May</text>
-                        <text x="260" y="115" textAnchor="middle" className="chart-axis-text">Jun</text>
-                      </svg>
+                      {trend.length > 0 ? (
+                        <svg viewBox="0 0 300 120" className="chart-svg">
+                          <line x1="30" y1="20" x2="280" y2="20" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                          <line x1="30" y1="50" x2="280" y2="50" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                          <line x1="30" y1="80" x2="280" y2="80" stroke="var(--grey-200)" strokeDasharray="3,3" />
+                          <line x1="30" y1="100" x2="280" y2="100" stroke="var(--grey-300)" />
+                          
+                          {payrollPoints.map((p, idx) => (
+                            <rect
+                              key={idx}
+                              x={p.x}
+                              y={p.y}
+                              width="16"
+                              height={p.height}
+                              rx="3"
+                              fill={idx >= trend.length - 2 ? "var(--theme-600)" : "var(--theme-400)"}
+                            />
+                          ))}
+                          
+                          {payrollPoints.map((p, idx) => (
+                            <text key={idx} x={p.x + 8} y="115" textAnchor="middle" className="chart-axis-text">
+                              {p.month.split(' ')[0]}
+                            </text>
+                          ))}
+                        </svg>
+                      ) : (
+                        <div style={emptyStyle}>No payroll history available.</div>
+                      )}
                     </div>
                   </div>
 
@@ -1000,60 +1078,55 @@ function Dashboard() {
                   <div className="premium-table-card chart-card">
                     <div className="chart-card-header">
                       <span className="chart-title">Attendance Summary</span>
-                      <span className="chart-badge positive">94% Present</span>
+                      {(presentCount > 0 || absentCount > 0) && (
+                        <span className="chart-badge positive">{presentPct}% Present</span>
+                      )}
                     </div>
                     <div className="chart-content attendance-layout">
-                      <div className="attendance-bar-container">
-                        <div className="attendance-label-row">
-                          <span className="att-title">Today's Attendance</span>
-                          <span className="att-pct">94%</span>
-                        </div>
-                        <div className="attendance-stacked-bar">
-                          <div className="attendance-segment present" style={{ width: "94%" }} title="Present: 94%" />
-                          <div className="attendance-segment leave" style={{ width: "4%" }} title="On Leave: 4%" />
-                          <div className="attendance-segment absent" style={{ width: "2%" }} title="Absent: 2%" />
-                        </div>
-                      </div>
-                      
-                      <div className="attendance-stats-legend">
-                        <div className="att-legend-item">
-                          <div className="att-legend-bullet present" />
-                          <div className="att-legend-info">
-                            <span className="att-legend-name">Present</span>
-                            <span className="att-legend-val">95 staff</span>
+                      {(presentCount > 0 || absentCount > 0) ? (
+                        <>
+                          <div className="attendance-bar-container">
+                            <div className="attendance-label-row">
+                              <span className="att-title">Today's Attendance</span>
+                              <span className="att-pct">{presentPct}%</span>
+                            </div>
+                            <div className="attendance-stacked-bar">
+                              <div className="attendance-segment present" style={{ width: `${presentPct}%` }} title={`Present: ${presentPct}%`} />
+                              <div className="attendance-segment leave" style={{ width: `${leavePct}%` }} title={`On Leave: ${leavePct}%`} />
+                              <div className="attendance-segment absent" style={{ width: `${absentPct}%` }} title={`Absent: ${absentPct}%`} />
+                            </div>
                           </div>
-                        </div>
-                        <div className="att-legend-item">
-                          <div className="att-legend-bullet leave" />
-                          <div className="att-legend-info">
-                            <span className="att-legend-name">On Leave</span>
-                            <span className="att-legend-val">4 staff</span>
+                          
+                          <div className="attendance-stats-legend">
+                            <div className="att-legend-item">
+                              <div className="att-legend-bullet present" />
+                              <div className="att-legend-info">
+                                <span className="att-legend-name">Present</span>
+                                <span className="att-legend-val">{presentCount} staff</span>
+                              </div>
+                            </div>
+                            <div className="att-legend-item">
+                              <div className="att-legend-bullet leave" />
+                              <div className="att-legend-info">
+                                <span className="att-legend-name">On Leave</span>
+                                <span className="att-legend-val">{leaveCount} staff</span>
+                              </div>
+                            </div>
+                            <div className="att-legend-item">
+                              <div className="att-legend-bullet absent" />
+                              <div className="att-legend-info">
+                                <span className="att-legend-name">Absent</span>
+                                <span className="att-legend-val">{absentCount} staff</span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="att-legend-item">
-                          <div className="att-legend-bullet absent" />
-                          <div className="att-legend-info">
-                            <span className="att-legend-name">Absent</span>
-                            <span className="att-legend-val">2 staff</span>
-                          </div>
-                        </div>
-                      </div>
+                        </>
+                      ) : (
+                        <div style={emptyStyle}>No attendance data available.</div>
+                      )}
                     </div>
                   </div>
 
-                </div>
-              ) : (
-                <div className="charts-empty-grid">
-                  <div className="premium-table-card empty-chart-placeholder-card">
-                    <div className="empty-chart-illustration">📊</div>
-                    <h5>No employee growth data available</h5>
-                    <p>Import employees to begin analytics and see growth graphs.</p>
-                  </div>
-                  <div className="premium-table-card empty-chart-placeholder-card">
-                    <div className="empty-chart-illustration">🏢</div>
-                    <h5>No division distribution data available</h5>
-                    <p>Analytics will populate here once active division members are loaded.</p>
-                  </div>
                 </div>
               )}
             </div>
@@ -1064,21 +1137,21 @@ function Dashboard() {
                 <h3>Recent Activity</h3>
               </div>
               <div className="premium-table-card activity-card">
-                {activityLoading ? (
+                {loading ? (
                   <div className="activity-loading">
                     <div className="loader-ring" />
                     <span>Loading recent activity...</span>
                   </div>
-                ) : activities.length > 0 ? (
+                ) : (data?.recent_activity || []).length > 0 ? (
                   <>
                     <div className="activity-pulse-header">
                       <span className="live-pulse"><span className="pulse-circle"></span> Live Feed</span>
-                      <span className="activity-count">{activities.length} events today</span>
+                      <span className="activity-count">{(data?.recent_activity || []).length} events</span>
                     </div>
                     
                     <div className="activity-timeline">
-                      {activities.map((act) => {
-                        const iconData = getActivityIcon(act.action);
+                      {data.recent_activity.map((act) => {
+                        const iconData = getActivityIcon(act.icon);
                         return (
                           <div key={act.id} className="timeline-item">
                             <div className={`timeline-icon-wrap ${iconData.bgClass}`}>
@@ -1086,9 +1159,9 @@ function Dashboard() {
                             </div>
                             <div className="timeline-content">
                               <p className="timeline-text">
-                                <strong>{act.action}</strong>: {formatMetadata(act.metadata)}
+                                <strong>{act.title}</strong>: {act.description}
                               </p>
-                              <span className="timeline-time">{formatRelativeTime(act.timestamp)}</span>
+                              <span className="timeline-time">{formatRelativeTime(act.created_at)}</span>
                             </div>
                           </div>
                         );
@@ -1100,7 +1173,7 @@ function Dashboard() {
                     <div className="activity-empty-icon">🔔</div>
                     <h5 className="activity-empty-title">No recent activity yet</h5>
                     <p className="activity-empty-text">
-                      Activities will appear here once users begin using the system.
+                      No recent activity.
                     </p>
                   </div>
                 )}

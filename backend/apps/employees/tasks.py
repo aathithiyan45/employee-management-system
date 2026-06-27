@@ -51,6 +51,16 @@ def process_employee_import(job_id, file_path, user_id, send_email=True):
                 
                 job.duration_ms = result.get('duration_ms', 0)
                 job.message = "Import completed successfully."
+                from apps.analytics.utils import log_event
+                log_event(
+                    user, 
+                    "bulk_import", 
+                    {
+                        "job_id": str(job_id), 
+                        "success": result['success'], 
+                        "failed": result['failed']
+                    }
+                )
             else:
                 job.status = 'failed'
                 job.message = str(result)

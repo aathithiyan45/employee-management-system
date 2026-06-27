@@ -18,6 +18,7 @@ import Invoices      from "./pages/Invoices";
 import EmployeeAnalytics from "./pages/EmployeeAnalytics";
 import PrivateRoute   from "./components/PrivateRoute";
 import MyProfile      from "./pages/MyProfile";
+import AppLayout      from "./components/AppLayout";
 
 import "./App.css";
 
@@ -37,12 +38,10 @@ function App() {
         <Route path="/employees" element={
           <PrivateRoute requiredRole="admin"><EmployeeList /></PrivateRoute>
         } />
-        <Route path="/employees/:empId" element={
-          <PrivateRoute requiredRole="admin"><EmployeeDetail /></PrivateRoute>
-        } />
-        <Route path="/employees/:empId/profile" element={
-          <PrivateRoute requiredRole="admin"><EmployeeProfile /></PrivateRoute>
-        } />
+        <Route element={<PrivateRoute requiredRole="admin"><AppLayout /></PrivateRoute>}>
+          <Route path="/employees/:empId" element={<EmployeeDetail />} />
+          <Route path="/employees/:empId/profile" element={<EmployeeProfile />} />
+        </Route>
         <Route path="/import" element={
           <PrivateRoute requiredRole="admin"><ImportEmployees /></PrivateRoute>
         } />

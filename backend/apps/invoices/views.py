@@ -17,6 +17,26 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['invoice_no', 'client_number', 'project_name']
 
+    def perform_create(self, serializer):
+        invoice = serializer.save()
+        from apps.analytics.utils import log_event
+        log_event(
+            self.request.user, 
+            "invoice_created", 
+            {"invoice_no": invoice.invoice_no, "project_name": invoice.project_name}, 
+            request=self.request
+        )
+
+    def perform_update(self, serializer):
+        invoice = serializer.save()
+        from apps.analytics.utils import log_event
+        log_event(
+            self.request.user, 
+            "invoice_updated", 
+            {"invoice_no": invoice.invoice_no, "project_name": invoice.project_name}, 
+            request=self.request
+        )
+
     @action(detail=False, methods=['post'])
     def upload(self, request):
         file = request.FILES.get('file')
@@ -125,6 +145,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             if to_create:
                 Invoice.objects.bulk_create(to_create, batch_size=500)
                 success_count = len(to_create)
+                from apps.analytics.utils import log_event
+                log_event(
+                    request.user, 
+                    "invoice_created", 
+                    {"bulk_upload": True, "count": success_count, "invoice_no": "Bulk Upload", "project_name": "Multiple Projects"},
+                    request=request
+                )
 
             return Response({
                 "message": f"Successfully uploaded {success_count} invoices.",

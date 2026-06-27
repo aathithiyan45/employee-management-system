@@ -120,57 +120,10 @@ def generate_password(length=10):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminOrHR])
 def dashboard_view(request):
-    division_name = request.GET.get("division")
-
-    if not division_name:
-        return Response({"error": "Division required"}, status=400)
-
-    today        = date.today()
-    next_30_days = today + timedelta(days=30)
-    next_60_days = today + timedelta(days=60)
-    next_90_days = today + timedelta(days=90)
-
-    if division_name == "all":
-        employees = Employee.objects.all()
-    else:
-        employees = Employee.objects.filter(division__name=division_name)
-
-    total    = employees.count()
-    active   = employees.filter(is_active=True).count()
-    inactive = employees.filter(is_active=False).count()
-
-    active_employees = employees.filter(is_active=True)
-
-    wp_expiring = active_employees.filter(
-        wp_expiry__range=(today, next_60_days)
-    ).count()
-
-    passport_expiring = active_employees.filter(
-        passport_expiry__range=(today, next_90_days)
-    ).count()
-
-    ssic_gt_expiring = active_employees.filter(
-        ssic_gt_exp__range=(today, next_60_days)
-    ).count()
-
-    incomplete_profiles = employees.filter(
-        Q(phone__isnull=True)          | Q(phone="") |
-        Q(nationality__isnull=True)    | Q(nationality="") |
-        Q(dob__isnull=True)            |
-        Q(passport_no__isnull=True)    | Q(passport_no="") |
-        Q(work_permit_no__isnull=True) | Q(work_permit_no="") |
-        Q(date_joined_company__isnull=True)
-    ).count()
-
-    return Response({
-        "total_employees":     total,
-        "active_employees":    active,
-        "inactive_employees":  inactive,
-        "wp_expiring":         wp_expiring,
-        "passport_expiring":   passport_expiring,
-        "ssic_gt_expiring":    ssic_gt_expiring,
-        "incomplete_profiles": incomplete_profiles,
-    })
+    division_name = request.GET.get("division", "all")
+    from apps.analytics.services.dashboard_service import get_dashboard_summary
+    data = get_dashboard_summary(division_name)
+    return Response(data)
 
 
 
@@ -507,6 +460,8 @@ def employee_detail(request, emp_id):
             "name":     e.name,
             "division": e.division.name if e.division else None
         }
+        from apps.analytics.utils import log_event
+        log_event(request.user, "employee_deleted", {"emp_id": e.emp_id, "name": e.name}, request=request)
         e.delete()
         return Response({"message": "Employee deleted successfully", "employee": emp_info})
 
@@ -725,6 +680,8 @@ def update_employee(request, emp_id):
         return Response({"error": "No valid fields to update"}, status=400)
 
     emp.save()
+    from apps.analytics.utils import log_event
+    log_event(request.user, "employee_updated", {"emp_id": emp.emp_id, "name": emp.name, "updated_fields": updated_fields}, request=request)
     return Response({
         "message":          "Employee updated successfully",
         "updated_fields":   updated_fields,

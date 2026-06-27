@@ -203,11 +203,22 @@ class PayrollViewSet(viewsets.ModelViewSet):
                     status='pending'
                 ))
 
-        # 3. Bulk DB Operations
         if to_create:
             Payroll.objects.bulk_create(to_create)
         if to_update:
             Payroll.objects.bulk_update(to_update, ['total_hours', 'per_hour', 'total_salary'])
+
+        from apps.analytics.utils import log_event
+        log_event(
+            request.user, 
+            "payroll_generated", 
+            {
+                "month": target_date.strftime("%Y-%m"),
+                "created": len(to_create),
+                "updated": len(to_update)
+            }, 
+            request=request
+        )
 
         return Response(
             {

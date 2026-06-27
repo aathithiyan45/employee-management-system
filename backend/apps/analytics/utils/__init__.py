@@ -1,6 +1,10 @@
-from .models import AuditLog
+from apps.analytics.models import AuditLog
 
 def log_event(user, event, details=None, request=None):
+    """
+    Logs structured audit events to the database.
+    Retains identical arguments to prevent breaking existing code.
+    """
     ip = None
     if request:
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')

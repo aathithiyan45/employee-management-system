@@ -117,6 +117,22 @@ def document_list_upload(request, emp_id):
             
             emp.save()
 
+        # Log the upload event
+        event_name = "work_permit_updated" if doc_type == "work_permit" else "document_uploaded"
+        from apps.analytics.utils import log_event
+        log_event(
+            request.user, 
+            event_name, 
+            {
+                "doc_id": doc.id, 
+                "doc_type": doc.doc_type, 
+                "label": doc.label or doc.get_doc_type_display(),
+                "employee_id": emp.emp_id,
+                "file_name": os.path.basename(doc.file.name)
+            }, 
+            request=request
+        )
+
     except Exception as e:
         return Response({'error': f"Failed to save document: {str(e)}"}, status=500)
 

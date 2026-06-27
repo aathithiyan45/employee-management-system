@@ -20,7 +20,6 @@ function EmployeeProfile() {
     setToast({ message, type });
   };
 
-
   const val = (v) => (v !== null && v !== undefined && v !== "" ? v : "—");
 
   // Get user info from localStorage
@@ -65,10 +64,10 @@ function EmployeeProfile() {
       await api.put(`employees/${empId}/update/`, updateData);
       setEmp({ ...emp, [field]: formData[field] });
       setEditing({ ...editing, [field]: false });
-      showToast(`${field} updated successfully`);
+      showToast(`${field.replace(/_/g, ' ')} updated successfully`);
     } catch (error) {
       console.error("Error updating field:", error);
-      showToast(`Failed to update ${field}`, "error");
+      showToast(`Failed to update ${field.replace(/_/g, ' ')}`, "error");
     }
   };
 
@@ -92,7 +91,7 @@ function EmployeeProfile() {
     return (
       <div className="detail-loading">
         <div className="detail-spinner" />
-        <p>Loading employee…</p>
+        <p>Loading editor interface...</p>
       </div>
     );
 
@@ -108,73 +107,84 @@ function EmployeeProfile() {
 
   const isActive = emp.status?.toLowerCase() === "active";
 
+  const certsList = [
+    { label: "Work At Height", field: "work_at_height", value: formData.work_at_height },
+    { label: "Confined Space", field: "confined_space", value: formData.confined_space },
+    { label: "Signalman / Rigger", field: "signalman_rigger", value: formData.signalman_rigger },
+    { label: "Firewatchman", field: "firewatchman", value: formData.firewatchman },
+    { label: "Gas Meter Carrier", field: "gas_meter_carrier", value: formData.gas_meter_carrier }
+  ];
+
   return (
     <div className="detail-page">
-      {/* ── TOP BAR ───────────────────────────────────── */}
-      <div className="detail-topbar">
-        <div className="topbar-left">
-          <button className="back-btn" onClick={() => navigate(-1)}>
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-            Back to List
-          </button>
-        </div>
-        {user?.role === "admin" && (
-          <div className="topbar-right">
-            <button className="delete-btn" onClick={deleteEmployee}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
+      {/* ── 1. STICKY TOP BAR ──────────────────────────────── */}
+      <div className="detail-sticky-bar no-print">
+        <button className="btn-back-pill" onClick={() => navigate(`/employees/${emp.emp_id}`)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="btn-icon">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          View Profile
+        </button>
+        
+        <div className="detail-sticky-actions">
+          <span className="profile-edit-badge">
+            <span className="edit-pulse" />
+            Editing Mode
+          </span>
+          {user?.role === "admin" && (
+            <button className="btn-action-danger" onClick={deleteEmployee}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="btn-icon">
                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
               </svg>
               Delete Employee
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── HERO CARD ─────────────────────────────────── */}
-      <div className="detail-hero">
-        <div className="detail-avatar">{emp.name?.charAt(0).toUpperCase()}</div>
-        <div className="detail-hero-info">
-          <h1>{emp.name}</h1>
-          <p className="detail-hero-sub">
-            {emp.designation_ipa || emp.designation_aug || "Employee"}
-            <span className="hero-dot">·</span>
-            {emp.division}
-          </p>
-          <div className="detail-hero-badges">
-            <span className="emp-id-badge">{emp.emp_id}</span>
-            <span className={`status-pill ${isActive ? "active" : "inactive"}`}>
-              {emp.status}
-            </span>
-            {emp.nationality && (
-              <span className="nationality-badge">{emp.nationality}</span>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
-      {/* ── SECTIONS GRID ─────────────────────────────── */}
-      <div className="detail-sections">
-        {/* Basic Info */}
-        <Section title="Basic Info" icon="👤">
+      {/* ── 2. EDITING PROFILE HEADER ──────────────────────── */}
+      <div className="profile-header-card edit-mode">
+        <div className="profile-header-main">
+          <div className="employee-avatar-large edit-avatar">
+            {emp.name?.charAt(0).toUpperCase()}
+          </div>
+          <div className="profile-identity">
+            <div className="profile-name-row">
+              <h1>Editing {emp.name}</h1>
+              <span className={`status-badge-pill ${isActive ? "active" : "inactive"}`}>
+                <span className="badge-dot" />
+                {emp.status}
+              </span>
+            </div>
+            <p className="profile-meta-subtext">
+              <strong>{emp.designation_ipa || emp.designation_aug || "Employee"}</strong>
+              <span className="meta-separator">•</span>
+              <span>{emp.division}</span>
+              <span className="meta-separator">•</span>
+              <span className="profile-sub-id">ID: {emp.emp_id}</span>
+            </p>
+          </div>
+        </div>
+        
+        <div className="profile-header-side">
+          <p className="edit-instructions-tip">
+            💡 Click on any field value to edit details inline. Changes are synchronized to the database upon saving.
+          </p>
+        </div>
+      </div>
+
+      {/* ── SECTIONS DETAILS GRID ────────────────────────────── */}
+      <div className="detail-sections-container">
+        
+        {/* Basic Information */}
+        <Section title="Basic Information" icon="👤">
           <EditField
-            label="EMP ID"
+            label="Employee ID"
             value={<span className="mono-val">{emp.emp_id}</span>}
             editable={false}
           />
           <EditField
-            label="Phone"
+            label="Phone Number"
             field="phone"
             value={val(formData.phone)}
             isEditing={editing.phone}
@@ -204,77 +214,61 @@ function EmployeeProfile() {
             onCancel={() => cancelEditing("dob")}
             type="date"
           />
+        </Section>
+
+        {/* Employment details */}
+        <Section title="Employment details" icon="💼">
+          <EditField
+            label="Date of Joining"
+            field="doa"
+            value={val(formData.doa)}
+            isEditing={editing.doa}
+            onEdit={() => startEditing("doa")}
+            onChange={(v) => setFormData({ ...formData, doa: v })}
+            onSave={() => saveField("doa")}
+            onCancel={() => cancelEditing("doa")}
+            type="date"
+          />
+          <EditField
+            label="Arrival Date"
+            field="arrival_date"
+            value={val(formData.arrival_date)}
+            isEditing={editing.arrival_date}
+            onEdit={() => startEditing("arrival_date")}
+            onChange={(v) => setFormData({ ...formData, arrival_date: v })}
+            onSave={() => saveField("arrival_date")}
+            onCancel={() => cancelEditing("arrival_date")}
+            type="date"
+          />
+          <EditField
+            label="Accommodation"
+            field="accommodation"
+            value={val(formData.accommodation)}
+            isEditing={editing.accommodation}
+            onEdit={() => startEditing("accommodation")}
+            onChange={(v) => setFormData({ ...formData, accommodation: v })}
+            onSave={() => saveField("accommodation")}
+            onCancel={() => cancelEditing("accommodation")}
+          />
+          <EditField
+            label="PCP Status"
+            field="pcp_status"
+            value={val(formData.pcp_status)}
+            isEditing={editing.pcp_status}
+            onEdit={() => startEditing("pcp_status")}
+            onChange={(v) => setFormData({ ...formData, pcp_status: v })}
+            onSave={() => saveField("pcp_status")}
+            onCancel={() => cancelEditing("pcp_status")}
+          />
           <EditField
             label="Division"
             value={val(emp.division)}
             editable={false}
           />
           <EditField
-            label="Status"
-            value={
-              <span
-                className={`status-pill ${isActive ? "active" : "inactive"}`}
-              >
-                {emp.status}
-              </span>
-            }
+            label="Work Status"
+            value={<span className={`status-badge-pill ${isActive ? "active" : "inactive"}`}>{emp.status}</span>}
             editable={false}
-          />
-        </Section>
-
-        {/* Designation & Salary */}
-        <Section title="Designation & Salary" icon="💼">
-          <EditField
-            label="IPA Designation"
-            field="designation_ipa"
-            value={val(formData.designation_ipa)}
-            isEditing={editing.designation_ipa}
-            onEdit={() => startEditing("designation_ipa")}
-            onChange={(v) => setFormData({ ...formData, designation_ipa: v })}
-            onSave={() => saveField("designation_ipa")}
-            onCancel={() => cancelEditing("designation_ipa")}
-          />
-          <EditField
-            label="Aug Designation"
-            field="designation_aug"
-            value={val(formData.designation_aug)}
-            isEditing={editing.designation_aug}
-            onEdit={() => startEditing("designation_aug")}
-            onChange={(v) => setFormData({ ...formData, designation_aug: v })}
-            onSave={() => saveField("designation_aug")}
-            onCancel={() => cancelEditing("designation_aug")}
-          />
-          <EditField
-            label="IPA Salary"
-            field="ipa_salary"
-            value={val(formData.ipa_salary)}
-            isEditing={editing.ipa_salary}
-            onEdit={() => startEditing("ipa_salary")}
-            onChange={(v) => setFormData({ ...formData, ipa_salary: v })}
-            onSave={() => saveField("ipa_salary")}
-            onCancel={() => cancelEditing("ipa_salary")}
-            type="number"
-          />
-          <EditField
-            label="Per Hour"
-            field="per_hr"
-            value={val(formData.per_hr)}
-            isEditing={editing.per_hr}
-            onEdit={() => startEditing("per_hr")}
-            onChange={(v) => setFormData({ ...formData, per_hr: v })}
-            onSave={() => saveField("per_hr")}
-            onCancel={() => cancelEditing("per_hr")}
-            type="number"
-          />
-          <EditField
-            label="Bank Account"
-            field="bank_account"
-            value={val(formData.bank_account)}
-            isEditing={editing.bank_account}
-            onEdit={() => startEditing("bank_account")}
-            onChange={(v) => setFormData({ ...formData, bank_account: v })}
-            onSave={() => saveField("bank_account")}
-            onCancel={() => cancelEditing("bank_account")}
           />
         </Section>
 
@@ -347,7 +341,7 @@ function EmployeeProfile() {
             onCancel={() => cancelEditing("passport_no")}
           />
           <EditField
-            label="Expiry"
+            label="Passport Expiry"
             field="passport_expiry"
             value={<ExpiryVal date={formData.passport_expiry} />}
             isEditing={editing.passport_expiry}
@@ -363,9 +357,7 @@ function EmployeeProfile() {
             value={val(formData.passport_issue_date)}
             isEditing={editing.passport_issue_date}
             onEdit={() => startEditing("passport_issue_date")}
-            onChange={(v) =>
-              setFormData({ ...formData, passport_issue_date: v })
-            }
+            onChange={(v) => setFormData({ ...formData, passport_issue_date: v })}
             onSave={() => saveField("passport_issue_date")}
             onCancel={() => cancelEditing("passport_issue_date")}
             type="date"
@@ -376,58 +368,196 @@ function EmployeeProfile() {
             value={val(formData.passport_issue_place)}
             isEditing={editing.passport_issue_place}
             onEdit={() => startEditing("passport_issue_place")}
-            onChange={(v) =>
-              setFormData({ ...formData, passport_issue_place: v })
-            }
+            onChange={(v) => setFormData({ ...formData, passport_issue_place: v })}
             onSave={() => saveField("passport_issue_place")}
             onCancel={() => cancelEditing("passport_issue_place")}
           />
         </Section>
 
-        {/* Joining */}
-        <Section title="Joining Details" icon="📅">
+        {/* Security Bond */}
+        <Section title="Security Bond" icon="🔐">
           <EditField
-            label="Date of Joining"
-            field="doa"
-            value={val(formData.doa)}
-            isEditing={editing.doa}
-            onEdit={() => startEditing("doa")}
-            onChange={(v) => setFormData({ ...formData, doa: v })}
-            onSave={() => saveField("doa")}
-            onCancel={() => cancelEditing("doa")}
+            label="Bond No"
+            field="security_bond_no"
+            value={val(formData.security_bond_no)}
+            isEditing={editing.security_bond_no}
+            onEdit={() => startEditing("security_bond_no")}
+            onChange={(v) => setFormData({ ...formData, security_bond_no: v })}
+            onSave={() => saveField("security_bond_no")}
+            onCancel={() => cancelEditing("security_bond_no")}
+          />
+          <EditField
+            label="Bond Expiry"
+            field="security_bond_exp"
+            value={<ExpiryVal date={formData.security_bond_exp} />}
+            isEditing={editing.security_bond_exp}
+            onEdit={() => startEditing("security_bond_exp")}
+            onChange={(v) => setFormData({ ...formData, security_bond_exp: v })}
+            onSave={() => saveField("security_bond_exp")}
+            onCancel={() => cancelEditing("security_bond_exp")}
             type="date"
           />
-          <EditField
-            label="Arrival Date"
-            field="arrival_date"
-            value={val(formData.arrival_date)}
-            isEditing={editing.arrival_date}
-            onEdit={() => startEditing("arrival_date")}
-            onChange={(v) => setFormData({ ...formData, arrival_date: v })}
-            onSave={() => saveField("arrival_date")}
-            onCancel={() => cancelEditing("arrival_date")}
-            type="date"
-          />
-          <EditField
-            label="Accommodation"
-            field="accommodation"
-            value={val(formData.accommodation)}
-            isEditing={editing.accommodation}
-            onEdit={() => startEditing("accommodation")}
-            onChange={(v) => setFormData({ ...formData, accommodation: v })}
-            onSave={() => saveField("accommodation")}
-            onCancel={() => cancelEditing("accommodation")}
-          />
-          <EditField
-            label="PCP Status"
-            field="pcp_status"
-            value={val(formData.pcp_status)}
-            isEditing={editing.pcp_status}
-            onEdit={() => startEditing("pcp_status")}
-            onChange={(v) => setFormData({ ...formData, pcp_status: v })}
-            onSave={() => saveField("pcp_status")}
-            onCancel={() => cancelEditing("pcp_status")}
-          />
+        </Section>
+
+        {/* Certifications */}
+        <Section title="Certifications & Skills" icon="🏅" wide>
+          <div className="certs-display-grid">
+            <div className="certs-left-block">
+              <EditField
+                label="SSIC GT S/N"
+                field="ssic_gt_sn"
+                value={val(formData.ssic_gt_sn)}
+                isEditing={editing.ssic_gt_sn}
+                onEdit={() => startEditing("ssic_gt_sn")}
+                onChange={(v) => setFormData({ ...formData, ssic_gt_sn: v })}
+                onSave={() => saveField("ssic_gt_sn")}
+                onCancel={() => cancelEditing("ssic_gt_sn")}
+              />
+              <EditField
+                label="SSIC GT Expiry"
+                field="ssic_gt_exp"
+                value={<ExpiryVal date={formData.ssic_gt_exp} />}
+                isEditing={editing.ssic_gt_exp}
+                onEdit={() => startEditing("ssic_gt_exp")}
+                onChange={(v) => setFormData({ ...formData, ssic_gt_exp: v })}
+                onSave={() => saveField("ssic_gt_exp")}
+                onCancel={() => cancelEditing("ssic_gt_exp")}
+                type="date"
+              />
+              <EditField
+                label="SSIC HT S/N"
+                field="ssic_ht_sn"
+                value={val(formData.ssic_ht_sn)}
+                isEditing={editing.ssic_ht_sn}
+                onEdit={() => startEditing("ssic_ht_sn")}
+                onChange={(v) => setFormData({ ...formData, ssic_ht_sn: v })}
+                onSave={() => saveField("ssic_ht_sn")}
+                onCancel={() => cancelEditing("ssic_ht_sn")}
+              />
+              <EditField
+                label="SSIC HT Expiry"
+                field="ssic_ht_exp"
+                value={<ExpiryVal date={formData.ssic_ht_exp} />}
+                isEditing={editing.ssic_ht_exp}
+                onEdit={() => startEditing("ssic_ht_exp")}
+                onChange={(v) => setFormData({ ...formData, ssic_ht_exp: v })}
+                onSave={() => saveField("ssic_ht_exp")}
+                onCancel={() => cancelEditing("ssic_ht_exp")}
+                type="date"
+              />
+              <EditField
+                label="Dynamac Pass S/N"
+                field="dynamac_pass_sn"
+                value={val(formData.dynamac_pass_sn)}
+                isEditing={editing.dynamac_pass_sn}
+                onEdit={() => startEditing("dynamac_pass_sn")}
+                onChange={(v) => setFormData({ ...formData, dynamac_pass_sn: v })}
+                onSave={() => saveField("dynamac_pass_sn")}
+                onCancel={() => cancelEditing("dynamac_pass_sn")}
+              />
+              <EditField
+                label="Dynamac Expiry"
+                field="dynamac_pass_exp"
+                value={<ExpiryVal date={formData.dynamac_pass_exp} />}
+                isEditing={editing.dynamac_pass_exp}
+                onEdit={() => startEditing("dynamac_pass_exp")}
+                onChange={(v) => setFormData({ ...formData, dynamac_pass_exp: v })}
+                onSave={() => saveField("dynamac_pass_exp")}
+                onCancel={() => cancelEditing("dynamac_pass_exp")}
+                type="date"
+              />
+              <EditField
+                label="LSSC S/N"
+                field="lssc_sn"
+                value={val(formData.lssc_sn)}
+                isEditing={editing.lssc_sn}
+                onEdit={() => startEditing("lssc_sn")}
+                onChange={(v) => setFormData({ ...formData, lssc_sn: v })}
+                onSave={() => saveField("lssc_sn")}
+                onCancel={() => cancelEditing("lssc_sn")}
+              />
+              <EditField
+                label="Welder registration No"
+                field="welder_no"
+                value={val(formData.welder_no)}
+                isEditing={editing.welder_no}
+                onEdit={() => startEditing("welder_no")}
+                onChange={(v) => setFormData({ ...formData, welder_no: v })}
+                onSave={() => saveField("welder_no")}
+                onCancel={() => cancelEditing("welder_no")}
+              />
+            </div>
+            
+            <div className="certs-right-block">
+              <div className="skill-deck-title">Inline Skills Settings</div>
+              <div className="skill-chips-deck edit-mode">
+                {certsList.map((skill, idx) => (
+                  <div key={idx} className="skill-pill-chip-edit-wrap">
+                    <EditField
+                      label={skill.label}
+                      field={skill.field}
+                      value={skill.value}
+                      isEditing={editing[skill.field]}
+                      onEdit={() => startEditing(skill.field)}
+                      onChange={(v) => setFormData({ ...formData, [skill.field]: v })}
+                      onSave={() => saveField(skill.field)}
+                      onCancel={() => cancelEditing(skill.field)}
+                      type="boolean"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        {/* Payroll Summary */}
+        <Section title="Payroll Summary" icon="💳" wide>
+          <div className="payroll-fields-grid">
+            <EditField
+              label="IPA Salary"
+              field="ipa_salary"
+              value={val(formData.ipa_salary)}
+              isEditing={editing.ipa_salary}
+              onEdit={() => startEditing("ipa_salary")}
+              onChange={(v) => setFormData({ ...formData, ipa_salary: v })}
+              onSave={() => saveField("ipa_salary")}
+              onCancel={() => cancelEditing("ipa_salary")}
+              type="number"
+            />
+            <EditField
+              label="Per Hour rate"
+              field="per_hr"
+              value={val(formData.per_hr)}
+              isEditing={editing.per_hr}
+              onEdit={() => startEditing("per_hr")}
+              onChange={(v) => setFormData({ ...formData, per_hr: v })}
+              onSave={() => saveField("per_hr")}
+              onCancel={() => cancelEditing("per_hr")}
+              type="number"
+            />
+            <EditField
+              label="Latest Salary"
+              field="salary"
+              value={val(formData.salary)}
+              isEditing={editing.salary}
+              onEdit={() => startEditing("salary")}
+              onChange={(v) => setFormData({ ...formData, salary: v })}
+              onSave={() => saveField("salary")}
+              onCancel={() => cancelEditing("salary")}
+              type="number"
+            />
+            <EditField
+              label="Bank Account No"
+              field="bank_account"
+              value={val(formData.bank_account)}
+              isEditing={editing.bank_account}
+              onEdit={() => startEditing("bank_account")}
+              onChange={(v) => setFormData({ ...formData, bank_account: v })}
+              onSave={() => saveField("bank_account")}
+              onCancel={() => cancelEditing("bank_account")}
+            />
+          </div>
         </Section>
 
         {/* Qualification */}
@@ -445,47 +575,49 @@ function EmployeeProfile() {
         </Section>
 
         {/* Remarks */}
-        {formData.remarks && (
+        {formData.remarks !== undefined && (
           <Section title="Remarks" icon="📝" wide>
             <div className="remarks-section">
               {editing.remarks ? (
                 <div className="edit-textarea">
                   <textarea
-                    value={formData.remarks}
+                    value={formData.remarks || ""}
                     onChange={(e) =>
                       setFormData({ ...formData, remarks: e.target.value })
                     }
                     className="detail-textarea"
+                    placeholder="Enter remarks..."
                   />
                   <div className="edit-actions">
                     <button
                       className="save-btn"
                       onClick={() => saveField("remarks")}
                     >
-                      Save
+                      ✓ Save Remarks
                     </button>
                     <button
                       className="cancel-btn"
                       onClick={() => cancelEditing("remarks")}
                     >
-                      Cancel
+                      ✕ Cancel
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="remarks-view">
-                  <p className="remarks-text">{formData.remarks}</p>
+                  <p className="remarks-text">{formData.remarks || "No remarks entered."}</p>
                   <button
                     className="edit-btn-inline"
                     onClick={() => startEditing("remarks")}
                   >
-                    ✏️ Edit
+                    ✏️ Edit Remarks
                   </button>
                 </div>
               )}
             </div>
           </Section>
         )}
+
       </div>
 
       {showDeleteModal && (
@@ -532,7 +664,7 @@ function Section({ title, icon, children, wide }) {
         <span className="section-icon">{icon}</span>
         {title}
       </div>
-      <div className="section-grid">{children}</div>
+      <div className="section-grid-layout">{children}</div>
     </div>
   );
 }
@@ -558,26 +690,40 @@ function EditField({
     );
   }
 
+  const isBool = type === "boolean";
+
   return (
     <div className={`detail-field ${field ? "editable" : ""}`}>
       <div className="detail-field-label">{label}</div>
       {isEditing ? (
         <div className="field-edit-mode">
-          <input
-            type={type}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="detail-input"
-            autoFocus
-          />
+          {isBool ? (
+            <select
+              value={value ? "true" : "false"}
+              onChange={(e) => onChange(e.target.value === "true")}
+              className="detail-select-input"
+              autoFocus
+            >
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          ) : (
+            <input
+              type={type}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              className="detail-input"
+              autoFocus
+            />
+          )}
           <div className="edit-actions-stacked">
-            <button className="save-btn-full" onClick={onSave} title="Save">
+            <button className="save-btn-full" onClick={onSave} title="Save Changes">
               ✓ Save
             </button>
             <button
               className="cancel-btn-full"
               onClick={onCancel}
-              title="Cancel"
+              title="Cancel Changes"
             >
               ✕ Cancel
             </button>
@@ -588,7 +734,14 @@ function EditField({
           className={`detail-field-value ${field ? "editable-field" : ""}`}
           onClick={() => field && onEdit && onEdit()}
         >
-          {value}
+          {isBool ? (
+            <span className={`skill-pill-chip ${value ? "active" : "inactive"}`}>
+              <span className="skill-dot" />
+              {value ? "Yes" : "No"}
+            </span>
+          ) : (
+            value
+          )}
         </div>
       )}
     </div>
