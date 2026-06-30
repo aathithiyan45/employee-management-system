@@ -22,6 +22,81 @@ function EmployeeProfile() {
 
   const val = (v) => (v !== null && v !== undefined && v !== "" ? v : "—");
 
+  const getInitialsColor = (name) => {
+    if (!name) return "#4f46e5";
+    const colors = [
+      "#4f46e5", "#0284c7", "#0d9488", "#16a34a", 
+      "#ca8a04", "#ea580c", "#dc2626", "#7c3aed", "#db2777"
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  const getPhotoUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    const baseUrl = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
+    const host = baseUrl.replace(/\/api\/?$/, "");
+    return `${host}${url}`;
+  };
+
+  const handlePhotoChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate size (5MB max)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      showToast("File too large. Maximum allowed size is 5 MB.", "error");
+      return;
+    }
+
+    // Validate format
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      showToast("Invalid file format. Allowed: JPG, PNG, WEBP.", "error");
+      return;
+    }
+
+    // Upload using Multipart Form Data
+    const uploadFormData = new FormData();
+    uploadFormData.append("profile_photo", file);
+
+    try {
+      showToast("Uploading profile photo...");
+      const response = await api.put(`employees/${empId}/update/`, uploadFormData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      const newPhoto = response.data.profile_photo;
+      setEmp({ ...emp, profile_photo: newPhoto });
+      setFormData({ ...formData, profile_photo: newPhoto });
+      showToast("Profile photo updated successfully");
+    } catch (err) {
+      console.error("Error uploading profile photo:", err);
+      const errMsg = err.response?.data?.error || "Failed to upload photo";
+      showToast(errMsg, "error");
+    }
+  };
+
+  const handlePhotoRemove = async () => {
+    try {
+      showToast("Removing profile photo...");
+      await api.put(`employees/${empId}/update/`, {
+        profile_photo: "remove"
+      });
+      setEmp({ ...emp, profile_photo: null });
+      setFormData({ ...formData, profile_photo: null });
+      showToast("Profile photo removed successfully");
+    } catch (err) {
+      console.error("Error removing profile photo:", err);
+      showToast("Failed to remove photo", "error");
+    }
+  };
+
   // Get user info from localStorage
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem("user") || "{}");
@@ -145,8 +220,32 @@ function EmployeeProfile() {
       {/* ── 2. EDITING PROFILE HEADER ──────────────────────── */}
       <div className="profile-header-card edit-mode">
         <div className="profile-header-main">
-          <div className="employee-avatar-large edit-avatar">
-            {emp.name?.charAt(0).toUpperCase()}
+          <div className="profile-photo-editor-container">
+            <div 
+              className="employee-avatar-large edit-avatar edit-avatar-clickable" 
+              style={{ backgroundColor: emp.profile_photo ? 'transparent' : getInitialsColor(emp.name) }}
+            >
+              {emp.profile_photo ? (
+                <img src={getPhotoUrl(emp.profile_photo)} alt={emp.name} className="profile-avatar-image-editor" />
+              ) : (
+                emp.name?.charAt(0).toUpperCase()
+              )}
+              <label htmlFor="profile-photo-file-input" className="photo-edit-overlay" title="Upload / Replace Photo">
+                <span>Edit</span>
+              </label>
+            </div>
+            <input 
+              type="file" 
+              id="profile-photo-file-input" 
+              accept=".jpg,.jpeg,.png,.webp" 
+              style={{ display: 'none' }} 
+              onChange={handlePhotoChange} 
+            />
+            {emp.profile_photo && (
+              <button className="photo-remove-btn" onClick={handlePhotoRemove} title="Remove Photo">
+                ✕
+              </button>
+            )}
           </div>
           <div className="profile-identity">
             <div className="profile-name-row">

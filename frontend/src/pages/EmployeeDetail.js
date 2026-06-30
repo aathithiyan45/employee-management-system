@@ -113,6 +113,28 @@ function Icon({ name, size = 16, stroke = "currentColor", fill = "none" }) {
   );
 }
 
+const getInitialsColor = (name) => {
+  if (!name) return "#4f46e5";
+  const colors = [
+    "#4f46e5", "#0284c7", "#0d9488", "#16a34a", 
+    "#ca8a04", "#ea580c", "#dc2626", "#7c3aed", "#db2777"
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
+const getPhotoUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const baseUrl = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
+  const host = baseUrl.replace(/\/api\/?$/, "");
+  return `${host}${url}`;
+};
+
 function EmployeeDetail() {
   const { empId } = useParams();
   const navigate = useNavigate();
@@ -371,8 +393,15 @@ function EmployeeDetail() {
       {/* ── 2. HERO HEADER SECTION ───────────────────────────── */}
       <div className="profile-header-card">
         <div className="profile-header-main">
-          <div className="employee-avatar-large">
-            {emp.name?.charAt(0).toUpperCase()}
+          <div 
+            className="employee-avatar-large" 
+            style={{ backgroundColor: emp.profile_photo ? 'transparent' : getInitialsColor(emp.name) }}
+          >
+            {emp.profile_photo ? (
+              <img src={getPhotoUrl(emp.profile_photo)} alt={emp.name} className="employee-avatar-image-detail" />
+            ) : (
+              emp.name?.charAt(0).toUpperCase()
+            )}
           </div>
           <div className="profile-identity">
             <div className="profile-name-row">

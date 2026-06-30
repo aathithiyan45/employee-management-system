@@ -616,17 +616,42 @@ function Dashboard() {
             </div>
             
             {(() => {
-              const alertsList = [
-                { text: `${data?.summary?.passport_expiring || 0} passports expiring in 90 days`, type: 'passport', link: '/employees?expiry_alert=passport&days=90' },
-                { text: `${data?.summary?.wp_expiring || 0} work permits expiring in 60 days`, type: 'wp', link: '/employees?expiry_alert=wp&days=60' },
-                { text: `${data?.summary?.incomplete_profiles || 0} incomplete profiles`, type: 'incomplete', link: '/employees?incomplete=true' },
-                { text: "Payroll processing pending", type: 'payroll', link: '/payroll' },
-                { text: "2 failed document uploads", type: 'upload', link: '/employees' }
-              ];
+              const alertsList = [];
+              if (data?.summary?.passport_expiring > 0) {
+                alertsList.push({
+                  text: `${data.summary.passport_expiring} passports expiring in 90 days`,
+                  type: 'passport',
+                  link: '/employees?expiry_alert=passport&days=90'
+                });
+              }
+              if (data?.summary?.wp_expiring > 0) {
+                alertsList.push({
+                  text: `${data.summary.wp_expiring} work permits expiring in 60 days`,
+                  type: 'wp',
+                  link: '/employees?expiry_alert=wp&days=60'
+                });
+              }
+              if (data?.summary?.incomplete_profiles > 0) {
+                alertsList.push({
+                  text: `${data.summary.incomplete_profiles} incomplete profiles`,
+                  type: 'incomplete',
+                  link: '/employees?incomplete=true'
+                });
+              }
+              if (data?.summary?.ssic_gt_expiring > 0) {
+                alertsList.push({
+                  text: `${data.summary.ssic_gt_expiring} SSIC/ID certificates expiring in 60 days`,
+                  type: 'ssic',
+                  link: '/employees?expiry_alert=ssic&days=60'
+                });
+              }
+
               return (
                 <div className="notification-trigger" title="Alerts Center" onClick={() => setAlertsOpen(!alertsOpen)}>
                   <Icon d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" size={18} stroke="#4f46e5" />
-                  <span className="notification-badge">{alertsList.length}</span>
+                  {alertsList.length > 0 && (
+                    <span className="notification-badge">{alertsList.length}</span>
+                  )}
 
                   {alertsOpen && (
                     <div className="alerts-dropdown-panel" onClick={(e) => e.stopPropagation()}>
@@ -634,14 +659,22 @@ function Dashboard() {
                         <h4>Alerts ({alertsList.length})</h4>
                         <button className="close-panel-btn" onClick={() => setAlertsOpen(false)}>×</button>
                       </div>
-                      <ul className="alerts-panel-list">
-                        {alertsList.map((alert, idx) => (
-                          <li key={idx} className={`alerts-panel-item ${alert.type}`} onClick={() => { navigate(alert.link); setAlertsOpen(false); }}>
-                            <span className="alert-bullet">•</span>
-                            <span className="alert-text">{alert.text}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      {alertsList.length > 0 ? (
+                        <ul className="alerts-panel-list">
+                          {alertsList.map((alert, idx) => (
+                            <li key={idx} className={`alerts-panel-item ${alert.type}`} onClick={() => { navigate(alert.link); setAlertsOpen(false); }}>
+                              <span className="alert-bullet">•</span>
+                              <span className="alert-text">{alert.text}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="alerts-panel-empty">
+                          <div className="alerts-empty-icon-circle">✓</div>
+                          <h5>All caught up!</h5>
+                          <p>No critical issues require attention.</p>
+                        </div>
+                      )}
                       <div className="alerts-panel-footer">
                         <button className="view-all-alerts-btn" onClick={() => { navigate("/employees?incomplete=true"); setAlertsOpen(false); }}>
                           View All Alerts &rarr;

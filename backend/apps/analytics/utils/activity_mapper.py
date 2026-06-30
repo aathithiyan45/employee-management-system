@@ -66,6 +66,19 @@ def map_audit_event(log):
         desc = f"Action performed by {user_display}"
         icon = "user"
         
+    employee_photo = None
+    employee_name = None
+    emp_id = details.get('emp_id') or details.get('employee_id')
+    if emp_id:
+        from apps.employees.models import Employee
+        try:
+            emp = Employee.objects.only('profile_photo', 'name').get(emp_id=emp_id)
+            employee_name = emp.name
+            if emp.profile_photo:
+                employee_photo = emp.profile_photo.url
+        except Employee.DoesNotExist:
+            pass
+
     return {
         "id": log.id,
         "icon": icon,
@@ -73,5 +86,7 @@ def map_audit_event(log):
         "description": desc,
         "entity": "AuditLog",
         "user": user_display,
+        "employee_photo": employee_photo,
+        "employee_name": employee_name,
         "created_at": log.created_at.isoformat()
     }

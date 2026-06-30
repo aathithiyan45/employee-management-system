@@ -197,6 +197,33 @@ def validate_upload(file, allowed_extensions, allowed_magic, max_bytes):
     return True, None
 
 
+def validate_image_file(file):
+    """
+    Validates uploaded profile photo:
+      1. Size - reject files that exceed 5 MB
+      2. Extension - reject non-image file extensions (jpg, jpeg, png, webp)
+      3. Magic bytes - verify image content signature
+    """
+    max_size = 5 * 1024 * 1024
+    if file.size > max_size:
+        raise ValidationError("File too large. Maximum allowed size is 5 MB.")
+
+    import os
+    ext = os.path.splitext(file.name)[1].lower()
+    if ext not in ['.jpg', '.jpeg', '.png', '.webp']:
+        raise ValidationError("Invalid file type. Allowed: JPG, PNG, WEBP.")
+
+    header = file.read(8)
+    file.seek(0)
+    allowed_magic = [
+        b'\xff\xd8\xff',           # JPEG/JPG
+        b'\x89PNG\r\n\x1a\n',       # PNG
+        b'RIFF'                    # WEBP
+    ]
+    if not any(header.startswith(magic) for magic in allowed_magic):
+        raise ValidationError("Invalid image content. Must be a valid JPG, PNG, or WEBP.")
+
+
 # ─────────────────────────────────────────────
 # EXCEL IMPORT — with auto user creation
 # ─────────────────────────────────────────────
@@ -426,6 +453,7 @@ def employee_list(request):
             "designation":      e.designation_ipa,
             "division":         e.division.name,
             "status":           "Active" if e.is_active else "Inactive",
+            "profile_photo":    e.profile_photo.url if e.profile_photo else None,
             # Salary is sensitive — only admin/hr can see it
             **({"salary": e.ipa_salary} if is_privileged else {}),
             "date_joined":      e.date_joined_company,
@@ -480,6 +508,7 @@ def employee_detail(request, emp_id):
         "division":    e.division.name,
         "status":      "Active" if e.is_active else "Inactive",
         "qualification": e.qualification,
+        "profile_photo": request.build_absolute_uri(e.profile_photo.url) if e.profile_photo else None,
 
         "designation_ipa":  e.designation_ipa,
         "designation_aug":  e.designation_aug,
@@ -676,6 +705,23 @@ def update_employee(request, emp_id):
             setattr(emp, bf, bool(request.data[bf]))
             updated_fields.append(bf)
 
+    # ── Handle Profile Photo Upload / Removal
+    if 'profile_photo' in request.FILES:
+        photo = request.FILES['profile_photo']
+        try:
+            validate_image_file(photo)
+            if emp.profile_photo:
+                emp.profile_photo.delete(save=False)
+            emp.profile_photo = photo
+            updated_fields.append('profile_photo')
+        except ValidationError as ve:
+            return Response({"error": ve.message}, status=400)
+    elif request.data.get('profile_photo') == 'remove':
+        if emp.profile_photo:
+            emp.profile_photo.delete(save=False)
+        emp.profile_photo = None
+        updated_fields.append('profile_photo')
+
     if not updated_fields:
         return Response({"error": "No valid fields to update"}, status=400)
 
@@ -686,10 +732,11 @@ def update_employee(request, emp_id):
         "message":          "Employee updated successfully",
         "updated_fields":   updated_fields,
         "experience_years": emp.experience_years,
+        "profile_photo":    request.build_absolute_uri(emp.profile_photo.url) if emp.profile_photo else None,
     })
 
 
-# ─────────────────────────────────────────────
+
 
 
 

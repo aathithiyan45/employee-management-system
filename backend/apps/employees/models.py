@@ -96,6 +96,7 @@ class Employee(models.Model):
     nationality   = models.CharField(max_length=50, blank=True, null=True)
     dob           = models.DateField(blank=True, null=True)
     qualification = models.CharField(max_length=100, blank=True, null=True)
+    profile_photo = models.ImageField(upload_to="employee_photos/", null=True, blank=True)
 
     # ── Division
     division = models.ForeignKey(

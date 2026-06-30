@@ -13,6 +13,28 @@ const Icon = ({ d, size = 16, stroke = "currentColor", fill = "none" }) => (
   </svg>
 );
 
+const getInitialsColor = (name) => {
+  if (!name) return "#4f46e5";
+  const colors = [
+    "#4f46e5", "#0284c7", "#0d9488", "#16a34a", 
+    "#ca8a04", "#ea580c", "#dc2626", "#7c3aed", "#db2777"
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
+};
+
+const getPhotoUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  const baseUrl = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
+  const host = baseUrl.replace(/\/api\/?$/, "");
+  return `${host}${url}`;
+};
+
 function EmployeeList() {
   const navigate = useNavigate();
 
@@ -679,7 +701,19 @@ function EmployeeList() {
                     </span>
                   </td>
                   <td className="text-left">
-                    <strong>{e.name}</strong>
+                    <div className="employee-table-cell-profile">
+                      {e.profile_photo ? (
+                        <img src={getPhotoUrl(e.profile_photo)} alt={e.name} className="employee-table-avatar" />
+                      ) : (
+                        <div 
+                          className="employee-table-avatar initials" 
+                          style={{ backgroundColor: getInitialsColor(e.name) }}
+                        >
+                          {e.name?.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <strong>{e.name}</strong>
+                    </div>
                   </td>
                   <td className="text-center">{e.phone || "—"}</td>
                   <td className="text-left">{e.designation_ipa || e.designation || "—"}</td>
