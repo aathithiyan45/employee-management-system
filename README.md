@@ -14,7 +14,7 @@ A full-stack Employee Management System built for internal HR and admin operatio
 - Protected API endpoints
 
 ### Employee Management
-- Add, edit, delete employee profiles
+- Add, edit, delete employee profiles 
 - Employee onboarding workflow
 - Department and designation management
 - Employee status management
