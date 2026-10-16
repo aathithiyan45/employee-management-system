@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 
 class WorkLog(models.Model):
-    employee = models.ForeignKey("employees.Employee", on_delete=models.CASCADE)
+    employee = models.ForeignKey("employees.Employee", on_delete=models.PROTECT)
 
     date = models.DateField()
     hours = models.FloatField(validators=[MaxValueValidator(24), MinValueValidator(0.5)])
@@ -19,7 +19,7 @@ class WorkLog(models.Model):
         return f"{self.employee} - {self.date} ({self.hours} hrs)"
 
 class Payroll(models.Model):
-    employee = models.ForeignKey("employees.Employee", on_delete=models.CASCADE)
+    employee = models.ForeignKey("employees.Employee", on_delete=models.PROTECT)
 
     month = models.DateField()
 

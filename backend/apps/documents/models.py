@@ -30,7 +30,7 @@ class EmployeeDocument(models.Model):
 
     employee    = models.ForeignKey(
         Employee,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name='documents'
     )
     doc_type    = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES)

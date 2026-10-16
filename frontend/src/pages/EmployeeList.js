@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../axiosInstance";
 import Toast from "../components/Toast.js";
@@ -33,6 +33,17 @@ const getPhotoUrl = (url) => {
   const baseUrl = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000/api/";
   const host = baseUrl.replace(/\/api\/?$/, "");
   return `${host}${url}`;
+};
+
+const formatDOB = (dobStr) => {
+  if (!dobStr) return "Not specified";
+  try {
+    const d = new Date(dobStr);
+    if (isNaN(d.getTime())) return dobStr;
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  } catch {
+    return dobStr;
+  }
 };
 
 function EmployeeList() {
@@ -75,6 +86,67 @@ function EmployeeList() {
     alerts: 0,
   });
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // ── Employee Hover Card State ─────────────────────────────
+  const [hoveredEmp, setHoveredEmp] = useState(null);
+  const [hoverCardPos, setHoverCardPos] = useState({ top: 0, left: 0, placement: "bottom" });
+  const hoverTimeoutRef = useRef(null);
+
+  const handleEmployeeHover = (emp, ev) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    const rect = ev.currentTarget.getBoundingClientRect();
+    const cardWidth = 280;
+    const cardHeight = 175;
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const placeAbove = spaceBelow < (cardHeight + 20) && rect.top > (cardHeight + 20);
+
+    const top = placeAbove
+      ? Math.max(10, rect.top - cardHeight - 8)
+      : Math.min(window.innerHeight - cardHeight - 10, rect.bottom + 8);
+
+    let left = rect.left;
+    if (left + cardWidth > window.innerWidth - 20) {
+      left = window.innerWidth - cardWidth - 20;
+    }
+    if (left < 20) left = 20;
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredEmp(emp);
+      setHoverCardPos({ top, left, placement: placeAbove ? "top" : "bottom" });
+    }, 100);
+  };
+
+  const handleEmployeeLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredEmp(null);
+    }, 140);
+  };
+
+  const handleCardMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+  };
+
+  const handleCardMouseLeave = () => {
+    handleEmployeeLeave();
+  };
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (hoveredEmp) {
+        setHoveredEmp(null);
+      }
+    };
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [hoveredEmp]);
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -696,12 +768,18 @@ function EmployeeList() {
                         ev.stopPropagation();
                         navigate(`/employees/${e.emp_id}`);
                       }}
+                      onMouseEnter={(ev) => handleEmployeeHover(e, ev)}
+                      onMouseLeave={handleEmployeeLeave}
                     >
                       {e.emp_id}
                     </span>
                   </td>
                   <td className="text-left">
-                    <div className="employee-table-cell-profile">
+                    <div 
+                      className="employee-table-cell-profile"
+                      onMouseEnter={(ev) => handleEmployeeHover(e, ev)}
+                      onMouseLeave={handleEmployeeLeave}
+                    >
                       {e.profile_photo ? (
                         <img src={getPhotoUrl(e.profile_photo)} alt={e.name} className="employee-table-avatar" />
                       ) : (
@@ -810,6 +888,89 @@ function EmployeeList() {
           type={toast.type}
           onClose={() => setToast(null)}
         />
+      )}
+
+      {/* ── EMPLOYEE HOVER PREVIEW CARD ───────────────── */}
+      {hoveredEmp && (
+        <div
+          className={`employee-hover-card ${hoverCardPos.placement}`}
+          style={{
+            top: `${hoverCardPos.top}px`,
+            left: `${hoverCardPos.left}px`,
+          }}
+          onMouseEnter={handleCardMouseEnter}
+          onMouseLeave={handleCardMouseLeave}
+          onClick={() => navigate(`/employees/${hoveredEmp.emp_id}`)}
+        >
+          <div className="hover-card-header">
+            <div className="hover-card-avatar-wrap">
+              {hoveredEmp.profile_photo ? (
+                <img
+                  src={getPhotoUrl(hoveredEmp.profile_photo)}
+                  alt={hoveredEmp.name}
+                  className="hover-card-avatar-img"
+                />
+              ) : (
+                <div
+                  className="hover-card-avatar-initials"
+                  style={{ backgroundColor: getInitialsColor(hoveredEmp.name) }}
+                >
+                  {hoveredEmp.name?.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className={`hover-card-status-dot ${hoveredEmp.status?.toLowerCase() === "active" ? "active" : "inactive"}`} />
+            </div>
+
+            <div className="hover-card-identity">
+              <div className="hover-card-name-row">
+                <span className="hover-card-name">{hoveredEmp.name}</span>
+              </div>
+              <span className="hover-card-id-badge">{hoveredEmp.emp_id}</span>
+              <span className="hover-card-role">
+                {hoveredEmp.designation_ipa || hoveredEmp.designation || "Employee"}
+              </span>
+            </div>
+          </div>
+
+          <div className="hover-card-divider" />
+
+          <div className="hover-card-details">
+            <div className="hover-card-detail-item">
+              <span className="detail-label">
+                <Icon d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" size={13} stroke="#64748b" />
+                Nationality
+              </span>
+              <span className="detail-value highlight">
+                {hoveredEmp.nationality || "Not specified"}
+              </span>
+            </div>
+
+            <div className="hover-card-detail-item">
+              <span className="detail-label">
+                <Icon d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={13} stroke="#64748b" />
+                DOB
+              </span>
+              <span className="detail-value">
+                {formatDOB(hoveredEmp.dob)}
+                {hoveredEmp.age ? ` (${hoveredEmp.age} yrs)` : ""}
+              </span>
+            </div>
+
+            <div className="hover-card-detail-item">
+              <span className="detail-label">
+                <Icon d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" size={13} stroke="#64748b" />
+                Division
+              </span>
+              <span className="detail-value">
+                {hoveredEmp.division || "—"}
+              </span>
+            </div>
+          </div>
+
+          <div className="hover-card-footer">
+            <span className="hover-card-tip">Click to view full profile &rarr;</span>
+          </div>
+        </div>
       )}
       </main>
     </div>
