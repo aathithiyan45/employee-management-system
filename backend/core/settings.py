@@ -81,16 +81,26 @@ X_FRAME_OPTIONS = 'DENY'
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='', cast=Csv())
-# ✅ ADD THIS
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:3000,"
+    "http://127.0.0.1:3000,"
+    "https://employee-management-system-6sgf.vercel.app"
+)
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default=DEFAULT_CORS_ORIGINS, cast=Csv())
+
+# Restrict Vercel preview deployments strictly to this project's slug
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"https://.*\.vercel\.app",
+    r"^https://employee-management-system-6sgf(-[a-zA-Z0-9]+)?\.vercel\.app$",
 ]
 CORS_EXPOSE_HEADERS = ["Content-Type", "Authorization"]
-CSRF_TRUSTED_ORIGINS = [
-    "https://employee-management-system-6sgf.vercel.app",
-    "https://employee-management-system-6sgf-72nqown13.vercel.app",
-]
+
+DEFAULT_CSRF_ORIGINS = (
+    "http://localhost:3000,"
+    "http://127.0.0.1:3000,"
+    "https://employee-management-system-6sgf.vercel.app,"
+    "https://employee-management-system-6sgf-72nqown13.vercel.app"
+)
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', default=DEFAULT_CSRF_ORIGINS, cast=Csv())
 # CSRF/Cookie Settings
 CSRF_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_HTTPONLY = False  # Must be False so frontend JS can read it for X-CSRFToken header

@@ -19,6 +19,7 @@ import EmployeeAnalytics from "./pages/EmployeeAnalytics";
 import PrivateRoute   from "./components/PrivateRoute";
 import MyProfile      from "./pages/MyProfile";
 import AppLayout      from "./components/AppLayout";
+import UsersAndRoles  from "./pages/UsersAndRoles";
 
 import "./App.css";
 
@@ -48,6 +49,10 @@ function App() {
         <Route path="/audit-logs" element={
           <PrivateRoute requiredRole="admin"><AuditLogs /></PrivateRoute>
         } />
+        <Route path="/users" element={
+          <PrivateRoute requiredRole="admin"><UsersAndRoles /></PrivateRoute>
+        } />
+        <Route path="/roles" element={<Navigate to="/users" replace />} />
 
         {/* ── Admin + HR shared routes ─────────────────────
             PrivateRoute allows hr role on "admin" routes    */}

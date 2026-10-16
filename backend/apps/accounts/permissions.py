@@ -11,3 +11,16 @@ class IsAdminOrHR(BasePermission):
             request.user.is_authenticated and 
             getattr(request.user, 'role', None) in ('admin', 'hr')
         )
+
+
+class IsAdminOnly(BasePermission):
+    """
+    Allows access only to Admin role users.
+    """
+    def has_permission(self, request, view):
+        return bool(
+            request.user and 
+            request.user.is_authenticated and 
+            getattr(request.user, 'role', None) == 'admin'
+        )
+

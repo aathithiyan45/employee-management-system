@@ -454,6 +454,9 @@ def employee_list(request):
             "division":         e.division.name,
             "status":           "Active" if e.is_active else "Inactive",
             "profile_photo":    e.profile_photo.url if e.profile_photo else None,
+            "nationality":      e.nationality,
+            "dob":              e.dob,
+            "age":              e.age,
             # Salary is sensitive — only admin/hr can see it
             **({"salary": e.ipa_salary} if is_privileged else {}),
             "date_joined":      e.date_joined_company,
@@ -480,7 +483,7 @@ def employee_detail(request, emp_id):
         return Response({"error": "Employee not found"}, status=404)
 
     if request.method == 'DELETE':
-        # Fix: use role check — not is_staff (a separate, unrelated Django flag)
+        # Admin access required
         if request.user.role != 'admin':
             return Response({"error": "Admin access required"}, status=403)
         emp_info = {
@@ -489,9 +492,63 @@ def employee_detail(request, emp_id):
             "division": e.division.name if e.division else None
         }
         from apps.analytics.utils import log_event
-        log_event(request.user, "employee_deleted", {"emp_id": e.emp_id, "name": e.name}, request=request)
-        e.delete()
-        return Response({"message": "Employee deleted successfully", "employee": emp_info})
+        from apps.payroll.models import Payroll, WorkLog
+        from apps.documents.models import EmployeeDocument
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+
+        permanent = request.GET.get('permanent', 'false').lower() == 'true'
+
+        if permanent:
+            # Check for linked historical/compliance records
+            has_payroll = Payroll.objects.filter(employee=e).exists()
+            has_worklogs = WorkLog.objects.filter(employee=e).exists()
+            has_documents = EmployeeDocument.objects.filter(employee=e).exists()
+
+            if has_payroll or has_worklogs or has_documents:
+                records = []
+                if has_payroll: records.append("payroll records")
+                if has_worklogs: records.append("work logs")
+                if has_documents: records.append("employee documents")
+                return Response(
+                    {
+                        "error": f"Cannot permanently delete employee with historical {', '.join(records)}. The employee must be deactivated instead to preserve financial and audit compliance."
+                    },
+                    status=400
+                )
+
+            # Clean deletion allowed for entries with no historical records (e.g. test or draft employee)
+            log_event(request.user, "employee_deleted_permanently", {"emp_id": e.emp_id, "name": e.name}, request=request)
+
+            if e.user:
+                u = e.user
+                e.user = None
+                e.save()
+                u.delete()
+
+            e.delete()
+            return Response({"message": "Employee permanently deleted.", "employee": emp_info, "permanent": True})
+
+        # ── Default: Soft Deletion (Deactivation) ──────────────
+        e.is_active = False
+        e.save(update_fields=['is_active'])
+
+        # Deactivate associated login user account if present
+        if e.user:
+            e.user.is_active = False
+            e.user.token_version = (e.user.token_version or 0) + 1
+            e.user.save(update_fields=['is_active', 'token_version'])
+            # Blacklist outstanding tokens
+            tokens = OutstandingToken.objects.filter(user=e.user)
+            for token in tokens:
+                BlacklistedToken.objects.get_or_create(token=token)
+
+        log_event(request.user, "employee_deactivated", {"emp_id": e.emp_id, "name": e.name, "soft_delete": True}, request=request)
+        return Response({
+            "message": "Employee deactivated successfully. Historical payroll, work logs, and documents preserved.",
+            "employee": emp_info,
+            "status": "Inactive",
+            "soft_deleted": True
+        })
 
     # GET — enforce access control
     if request.user.role not in ('admin', 'hr'):
@@ -632,7 +689,7 @@ def export_employees(request):
 # UPDATE EMPLOYEE
 # ─────────────────────────────────────────────
 
-@api_view(['PUT'])
+@api_view(['PUT', 'POST'])
 @permission_classes([IsAuthenticated, IsAdminOrHR])
 def update_employee(request, emp_id):
     # Fix IDOR: only admin or HR may update any employee record
@@ -721,6 +778,14 @@ def update_employee(request, emp_id):
             emp.profile_photo.delete(save=False)
         emp.profile_photo = None
         updated_fields.append('profile_photo')
+
+    # Status / Activation toggle
+    if 'is_active' in request.data:
+        emp.is_active = bool(request.data['is_active'])
+        updated_fields.append('is_active')
+        if emp.user:
+            emp.user.is_active = emp.is_active
+            emp.user.save(update_fields=['is_active'])
 
     if not updated_fields:
         return Response({"error": "No valid fields to update"}, status=400)
